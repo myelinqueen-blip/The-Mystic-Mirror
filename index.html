@@ -356,7 +356,7 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('firebaseBadge').innerHTML = '<span class="firebase-badge on">🔥 신심일기 연동됨</span>';
     await loadData(user.uid);
   } else {
-    document.getElementById('firebaseBadge').innerHTML = '<span class="firebase-badge off" onclick="showTab('settings')">⚙️ 설정에서 로그인하면 내 어서·스피치 연동</span>';
+    document.getElementById('firebaseBadge').innerHTML = '<span class="firebase-badge off" onclick="showTab(\"settings\")">⚙️ 설정에서 로그인하면 내 어서·스피치 연동</span>';
   }
 });
 
