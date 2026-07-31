@@ -272,7 +272,7 @@ textarea::placeholder{ color:#e0aabb; }
     <div class="setup-title">🔑 Gemini API 키</div>
     <div class="setup-step">
       <div class="setup-label">API 키 입력 (이 기기 브라우저에만 저장돼요)</div>
-      <input type="password" class="setup-input" id="geminiKeyInput" placeholder="AIza...">
+      <input type="password" class="setup-input" id="geminiKeyInput" placeholder="API 키 입력 (AIza... 또는 AQ...)">
       <button class="save-btn" onclick="saveGeminiKey()">저장하기</button>
       <div id="geminiKeyStatus" class="status-txt"></div>
     </div>
@@ -403,8 +403,8 @@ function googleLogin() { if(window._googleLogin) window._googleLogin(); }
 
 function saveGeminiKey() {
   const key = document.getElementById('geminiKeyInput').value.trim();
-  if (!key || !key.startsWith('AI')) {
-    document.getElementById('geminiKeyStatus').textContent = '❌ 올바른 키를 입력해줘요 (AI로 시작)';
+  if (!key || key.length < 10) {
+    document.getElementById('geminiKeyStatus').textContent = '❌ 키를 다시 확인해줘요';
     document.getElementById('geminiKeyStatus').style.color = '#c0567a';
     return;
   }
@@ -453,8 +453,8 @@ function googleLogin() { if(window._googleLogin) window._googleLogin(); }
 // Gemini 키 관리
 function saveGeminiKey() {
   const key = document.getElementById('geminiKeyInput').value.trim();
-  if (!key || !key.startsWith('AI')) {
-    document.getElementById('geminiKeyStatus').textContent = '❌ 올바른 키를 입력해줘요 (AI로 시작)';
+  if (!key || key.length < 10) {
+    document.getElementById('geminiKeyStatus').textContent = '❌ 키를 다시 확인해줘요';
     document.getElementById('geminiKeyStatus').style.color = '#c0567a';
     return;
   }
