@@ -312,7 +312,18 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getDatabase, ref, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
+// 인증: The Mystic Mirror / DB: shinshim-diary
 const firebaseConfig = {
+  apiKey:"AIzaSyCGR4fqwYBCY6iRuqAKLyr8lByI5N0U_3U",
+  authDomain:"the-mystic-mirror.firebaseapp.com",
+  projectId:"the-mystic-mirror",
+  storageBucket:"the-mystic-mirror.firebasestorage.app",
+  messagingSenderId:"564887720565",
+  appId:"1:564887720565:web:4c7faf19a0557766e31e3c"
+};
+
+// DB는 shinshim-diary Realtime Database 사용
+const dbConfig = {
   apiKey:"AIzaSyAvtgUROy9sqe4mnjcb3HV4TzRQ6bXsCQA",
   authDomain:"shinshim-diary.firebaseapp.com",
   databaseURL:"https://shinshim-diary-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -322,9 +333,10 @@ const firebaseConfig = {
   appId:"1:736639802328:web:1a8dabc364c22af453f0ad"
 };
 
-const fbApp = initializeApp(firebaseConfig);
+const fbApp = initializeApp(firebaseConfig);          // 인증용
+const dbApp = initializeApp(dbConfig, 'dbApp');       // DB용
 const auth = getAuth(fbApp);
-const db = getDatabase(fbApp);
+const db = getDatabase(dbApp);
 let firebaseData = { gosho:[], speeches:[] };
 
 // 전역 노출 (module 스코프 탈출)
