@@ -309,7 +309,7 @@ textarea::placeholder{ color:#e0aabb; }
 <script type="module">
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getDatabase, ref, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 // 인증 + DB 모두 shinshim-diary로 통일
@@ -331,22 +331,9 @@ let firebaseData = { gosho:[], speeches:[] };
 // 전역 노출 (module 스코프 탈출)
 window._googleLogin = async () => {
   try {
-    // Popup 먼저 시도
-    await signInWithPopup(auth, new GoogleAuthProvider());
+    await signInWithRedirect(auth, new GoogleAuthProvider());
   } catch(e) {
-    // Cross-Origin 등 팝업 차단시 Redirect로 전환
-    if (e.code === 'auth/popup-blocked' || 
-        e.code === 'auth/popup-closed-by-user' ||
-        e.message.includes('Cross-Origin') ||
-        e.message.includes('window.closed')) {
-      try {
-        await signInWithRedirect(auth, new GoogleAuthProvider());
-      } catch(e2) {
-        document.getElementById('loginStatus').textContent = '로그인 실패: ' + e2.message;
-      }
-    } else {
-      document.getElementById('loginStatus').textContent = '로그인 실패: ' + e.message;
-    }
+    document.getElementById('loginStatus').textContent = '로그인 실패: ' + e.message;
   }
 };
 
