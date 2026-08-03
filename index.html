@@ -359,7 +359,7 @@ onAuthStateChanged(auth, async function(user) {
       // DB 구조 확인 후 올바른 경로로 읽기
     // 루트 키: books, chanjeSettings, records, shinGoal
     // records 안에 어서·스피치가 있을 것으로 추정
-    const snap = await get(ref(db, '/'));
+    const snap = await get(ref(db, 'users/' + user.uid));
       if (!snap.exists()) return;
       function collect(obj, cat, depth) {
         if (depth > 8 || !obj || typeof obj !== 'object') return;
