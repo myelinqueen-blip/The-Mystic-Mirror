@@ -289,7 +289,7 @@ textarea::placeholder{color:#e0aabb;}
   </div>
   <div class="security-box" style="margin-top:10px;">
     <div class="setup-title">🛡️ 보안 안내</div>
-    <div class="security-txt">✅ Gemini API 키 — 이 브라우저에만 저장<br>✅ Firebase — 구글 로그인 후 본인 데이터만 접근<br>✅ 일기 내용 — 외부 서버 저장 없음<br>✅ 기록 — 이 기기 localStorage에만 저장<br>❌ 개인정보 외부 전송 없음</div>
+    <div class="security-txt">✅ Gemini API 키 — 이 브라우저에만 저장<br>✅ Firebase — 구글 로그인 후 본인 데이터만 접근<br>✅ 일기·어서·스피치 내용 — 의미 분석(임베딩)을 위해 Gemini API에만 전송, 별도 서버 저장 없음<br>✅ 임베딩 결과 — 이 기기 localStorage에만 저장 (첫 실행 시 한 번만 계산)<br>❌ 개인정보 외부 전송 없음</div>
   </div>
 </div>
 </div>
@@ -328,6 +328,7 @@ window._googleLogout = async function() {
   try {
     await signOut(auth);
     window._fbData = { gosho:[], speeches:[] };
+    window._fbUid = null;
     document.getElementById('loginStatus').textContent = '로그인하면 내 어서·스피치가 연동돼요';
   } catch(e) {
     console.error('로그아웃 오류:', e);
@@ -347,6 +348,7 @@ window._googleLogin = async function() {
 
 onAuthStateChanged(auth, async function(user) {
   if (user) {
+    window._fbUid = user.uid;
     const el = document.getElementById('loginStatus');
     const btn = document.getElementById('googleLoginBtn');
     const badge = document.getElementById('firebaseBadge');
@@ -431,8 +433,122 @@ onAuthStateChanged(auth, async function(user) {
 <!-- 메인 JS -->
 <script>
 const GOSHO = [{"en": "Those who believe in the Lotus Sutra are as if in winter, but winter always turns to spring.", "kr": "묘법연화경(妙法蓮華經)을 믿는 자는 마치 겨울과 같다. 그러나 겨울은 반드시 봄이 된다.", "source": "Winter Always Turns to Spring (妙一尼御前御書)", "url": "https://www.nichirenlibrary.org/en/wnd-1/Content/65"}, {"en": "Nam-myoho-renge-kyo is like the roar of a lion. What sickness can therefore be an obstacle?", "kr": "남묘호렌게쿄(南無妙法蓮華經)는 사자후(獅子吼)와 같다. 어떤 병이 장애가 될 수 있겠는가.", "source": "Reply to Kyoo (鏡忍房御書)", "url": "https://www.nichirenlibrary.org/en/wnd-1/Content/28"}, {"en": "More valuable than treasures in a storehouse are the treasures of the body, and the treasures of the heart are the most valuable of all.", "kr": "창고의 보물보다 몸의 보물이 낫고, 몸의 보물보다 마음의 보물이 가장 뛰어나다.", "source": "The Three Kinds of Treasure (崇峻天皇御書)", "url": "https://www.nichirenlibrary.org/en/wnd-1/Content/172"}, {"en": "Suffer what there is to suffer, enjoy what there is to enjoy. Regard both suffering and joy as facts of life.", "kr": "고(苦)는 고대로 받고, 즐거움은 즐거움대로 받아라. 고락(苦樂) 모두를 인생의 사실로 받아들이고, 어떤 일이 있어도 남묘호렌게쿄를 계속 올려라.", "source": "Happiness in This World (四條金吾殿御返事)", "url": "https://www.nichirenlibrary.org/en/wnd-1/Content/322"}, {"en": "A sword is useless in the hands of a coward. The mighty sword of the Lotus Sutra must be wielded by one courageous in faith.", "kr": "비겁한 자의 손에 쥐어진 칼은 아무 소용이 없다. 법화경(法華經)의 강검(強劍)은 신심(信心)에 용기 있는 자가 써야 한다.", "source": "The Supremacy of the Law (聖人御難事)", "url": "https://www.nichirenlibrary.org/en/wnd-1/Content/90"}, {"en": "Whatever trouble occurs, regard it as no more than a dream, and think only of the Lotus Sutra.", "kr": "어떤 고난이 닥쳐오더라도, 그것을 꿈에 불과하다고 여기고, 오직 법화경(法華經)만을 생각하라.", "source": "On Rebuking Slander of the Law (諌暁八幡抄)", "url": "https://www.nichirenlibrary.org/en/wnd-1/Content/58"}, {"en": "It is the heart that is important.", "kr": "중요한 것은 마음이다. 신심(信心)에 목숨을 바치는 사람은 무명(無明)의 어둠이 점점 밝아짐을 알게 된다.", "source": "The Hero of the World (諸法実相抄)", "url": "https://www.nichirenlibrary.org/en/wnd-1/Content/61"}, {"en": "The blessings gained by practicing the one vehicle of the Lotus Sutra are without limit and without measure.", "kr": "법화경(法華經)의 일승(一乘)을 수행하여 얻는 공덕(功德)은 한계도 없고 헤아릴 수도 없다.", "source": "On the Four Stages of Faith (四信五品抄)", "url": "https://www.nichirenlibrary.org/en/wnd-1/Content/62"}, {"en": "Even if it seems that I follow the ruler in my actions, I will never follow him in my heart.", "kr": "설령 몸은 지배자의 행동을 따른다 할지라도, 마음만은 결코 따르지 않겠다.", "source": "Actions of the Votary (諸法実相抄)", "url": "https://www.nichirenlibrary.org/en/wnd-1/Content/73"}, {"en": "It is by speaking out that one gains merit.", "kr": "불법(佛法)을 위해 아무리 많은 일을 해도, 말함으로써 공덕(功德)을 쌓는 것이다.", "source": "Teaching, Capacity, Time, and Country (教機時国抄)", "url": "https://www.nichirenlibrary.org/en/wnd-1/Content/43"}];
-const EASTERN = {"e1": {"id": "e1", "title": "의법불의인 (依法不依人)", "origin": "법화경·열반경", "cn": "依法不依人", "meaning": "법(진리)에 의지하되, 사람에 의지하지 말라.", "desc": "어떤 권위자의 말도 진리 앞에서는 검증되어야 한다. 맹목적 복종이 아닌 법 자체를 기준으로 삼는 태도.", "url": "https://www.nichirenlibrary.org/en/dic/"}, "e2": {"id": "e2", "title": "인부지이불온 (人不知而不慍)", "origin": "논어(論語) 학이편", "cn": "人不知而不慍，不亦君子乎", "meaning": "남이 나를 알아주지 않아도 성내지 않으니, 또한 군자가 아닌가.", "desc": "공자(孔子). 인정받지 못해도 내면의 평정을 잃지 않는 것이 군자의 덕목.", "url": "https://ctext.org/analects/xue-er"}, "e3": {"id": "e3", "title": "지족자부 (知足者富)", "origin": "도덕경(道德經) 33장", "cn": "知足者富", "meaning": "만족할 줄 아는 자가 부유하다.", "desc": "노자(老子). 욕망을 내려놓고 지금 있는 것에서 풍요를 발견하는 도가의 핵심.", "url": "https://ctext.org/dao-de-jing"}, "e4": {"id": "e4", "title": "불원인 (不怨天不尤人)", "origin": "논어(論語) 헌문편", "cn": "不怨天，不尤人", "meaning": "하늘을 원망하지 않고, 사람을 탓하지 않는다.", "desc": "공자. 외부를 탓하지 않고 자신에게서 원인을 찾는 자기 책임의 철학.", "url": "https://ctext.org/analects/xian-wen"}, "e5": {"id": "e5", "title": "호연지기 (浩然之氣)", "origin": "맹자(孟子) 공손추 상", "cn": "我善養吾浩然之氣", "meaning": "나는 나의 호연지기를 잘 기른다.", "desc": "맹자. 천지에 가득 찬 크고 굳센 기운. 올바른 도리를 꾸준히 실천할 때 쌓이는 내면의 힘.", "url": "https://ctext.org/mengzi/gong-sun-chou-i"}, "e6": {"id": "e6", "title": "천하무난사 (天下無難事)", "origin": "명심보감(明心寶鑑)", "cn": "天下無難事，只怕有心人", "meaning": "세상에 어려운 일은 없다. 오직 마음먹은 사람이 무서울 뿐.", "desc": "뜻을 세우고 꾸준히 나아가면 이루지 못할 것이 없다.", "url": "https://zh.wikisource.org/wiki/%E6%98%8E%E5%BF%83%E5%AF%B6%E9%91%91"}, "e7": {"id": "e7", "title": "상선약수 (上善若水)", "origin": "도덕경(道德經) 8장", "cn": "上善若水", "meaning": "최고의 선은 물과 같다.", "desc": "노자. 물처럼 다투지 않고 낮은 곳으로 흐르며 만물을 이롭게 한다. 겸손과 유연함의 덕목.", "url": "https://ctext.org/dao-de-jing"}, "e8": {"id": "e8", "title": "오일삼성 (吾日三省)", "origin": "논어(論語) 학이편", "cn": "吾日三省吾身", "meaning": "나는 날마다 세 가지로 나 자신을 반성한다.", "desc": "증자(曾子). 충실했는가, 신의를 지켰는가, 배운 것을 익혔는가를 매일 돌아보는 자기성찰.", "url": "https://ctext.org/analects/xue-er"}, "e9": {"id": "e9", "title": "무위자연 (無爲自然)", "origin": "도덕경(道德經)", "cn": "無爲而無不爲", "meaning": "함이 없으나 하지 않음이 없다.", "desc": "노자. 억지로 강요하지 않고 자연의 흐름을 따르면 모든 것이 이루어진다.", "url": "https://ctext.org/dao-de-jing"}, "e10": {"id": "e10", "title": "측은지심 (惻隱之心)", "origin": "맹자(孟子) 공손추 상", "cn": "惻隱之心，仁之端也", "meaning": "측은하게 여기는 마음이 인(仁)의 단서이다.", "desc": "맹자. 타인의 고통을 보고 불쌍히 여기는 마음이 인(仁)의 시작. 공감과 자비의 철학적 근거.", "url": "https://ctext.org/mengzi/gong-sun-chou-i"}, "e11": {"id": "e11", "title": "격물치지 (格物致知)", "origin": "대학(大學)", "cn": "格物而後知至", "meaning": "사물을 탐구한 뒤에 앎이 이르게 된다.", "desc": "주자학 핵심. 사물의 이치를 끝까지 탐구함으로써 지식과 지혜에 이른다.", "url": "https://ctext.org/liki/da-xue"}, "e12": {"id": "e12", "title": "제행무상 (諸行無常)", "origin": "불교 삼법인(三法印)", "cn": "諸行無常", "meaning": "모든 현상은 영원하지 않다.", "desc": "불교 근본 가르침. 영원하지 않은 것을 영원하다고 착각할 때 집착과 고통이 생긴다.", "url": "https://www.nichirenlibrary.org/en/dic/"}};
-const WESTERN = {"w1": {"id": "w1", "title": "양자 중첩 (Quantum Superposition)", "field": "양자역학", "summary": "관측 전 입자는 여러 상태를 동시에 가진다. 닐스 보어·하이젠베르크. 한 순간의 마음이 수천 가지 가능성을 품는다는 일념삼천(一念三千)과 구조적으로 유사하다.", "url": "https://www.britannica.com/science/quantum-mechanics-physics"}, "w2": {"id": "w2", "title": "관찰자 효과 (Observer Effect)", "field": "양자역학", "summary": "입자의 상태는 관측 행위 자체에 의해 결정된다. 내가 세계를 어떻게 바라보느냐가 세계를 바꾼다. 주관과 객관의 경계가 사라지는 지점.", "url": "https://www.britannica.com/science/observer-effect"}, "w3": {"id": "w3", "title": "엔트로피와 질서 (Entropy & Order)", "field": "열역학 제2법칙", "summary": "닫힌 계는 시간이 지날수록 무질서해진다. 그러나 에너지를 투입하면 국소적으로 질서가 생긴다. 수행과 노력이 혼돈 속에서 질서를 만드는 이유.", "url": "https://www.britannica.com/science/entropy-physics"}, "w4": {"id": "w4", "title": "신경가소성 (Neuroplasticity)", "field": "신경과학", "summary": "뇌는 경험과 훈련에 따라 구조와 기능을 재편한다. 반복적 수행이 실제로 뇌를 바꿀 수 있다는 과학적 근거. 숙명전환(宿命轉換)의 생물학적 메커니즘.", "url": "https://www.britannica.com/science/neuroplasticity"}, "w5": {"id": "w5", "title": "외상 후 성장 (Post-Traumatic Growth)", "field": "심리학", "summary": "테데스키·칼훈. 극심한 고난 후 오히려 이전보다 높은 심리적 성장이 일어난다. 숙명전환의 심리학적 대응 개념.", "url": "https://www.britannica.com/topic/post-traumatic-growth"}, "w6": {"id": "w6", "title": "나비 효과 (Butterfly Effect)", "field": "카오스 이론", "summary": "에드워드 로렌츠. 작은 초기 조건의 차이가 거대한 결과 차이를 만든다. 한 사람의 인간혁명(人間革命)이 사회 전체를 바꿀 수 있는 근거.", "url": "https://www.britannica.com/science/chaos-theory"}, "w7": {"id": "w7", "title": "무지의 지 (Socratic Ignorance)", "field": "서양철학 — 소크라테스", "summary": "나는 내가 모른다는 것을 안다. 자신의 무지를 아는 것이 지혜의 시작. 격물치지(格物致知)와 맥락이 통한다.", "url": "https://www.britannica.com/biography/Socrates"}, "w8": {"id": "w8", "title": "실존적 선택 (Sartrean Freedom)", "field": "실존주의 — 사르트르", "summary": "인간은 자유롭도록 선고받았다. 어떤 상황에서도 태도를 선택할 수 있다. 환경이 아닌 내면의 선택이 자신을 규정한다.", "url": "https://www.britannica.com/biography/Jean-Paul-Sartre"}, "w9": {"id": "w9", "title": "내면 통제 (Stoic Dichotomy of Control)", "field": "스토아 철학 — 에픽테토스", "summary": "우리가 통제할 수 있는 것(판단·욕구)과 없는 것(외부 사건)을 구분하라. 외부에 흔들리지 않는 내면의 요새.", "url": "https://www.britannica.com/topic/Stoicism"}, "w10": {"id": "w10", "title": "프랙탈 자기유사성 (Fractal Self-Similarity)", "field": "수학·복잡계", "summary": "만델브로트. 어떤 규모에서도 동일한 패턴이 반복된다. 묘법(妙法)이 우주의 모든 현상에 관통하는 하나의 법칙이라는 시각과 유사.", "url": "https://www.britannica.com/topic/fractal"}, "w11": {"id": "w11", "title": "밈 이론 (Memetics)", "field": "진화생물학 — 리처드 도킨스", "summary": "문화적 아이디어도 유전자처럼 복제·전파·진화한다. 광선유포(廣宣流布)의 문화적·생물학적 메커니즘.", "url": "https://www.britannica.com/topic/meme"}, "w12": {"id": "w12", "title": "의미치료 (Logotherapy)", "field": "실존심리학 — 빅터 프랭클", "summary": "어떤 고통에서도 의미를 찾는 것이 인간이다. 나치 수용소의 극한 상황에서 발견한 인간 존엄. 숙명전환의 심리학적 심층 근거.", "url": "https://www.britannica.com/biography/Viktor-Frankl"}, "w13": {"id": "w13", "title": "집단지성 (Collective Intelligence)", "field": "사회과학 — 피에르 레비", "summary": "개인의 지식을 넘어 집단이 연결될 때 더 높은 지혜가 출현한다. 이체동심(異體同心)의 사회과학적 구현.", "url": "https://www.britannica.com/topic/collective-intelligence"}, "w14": {"id": "w14", "title": "인과율 (Causality)", "field": "물리학·철학", "summary": "뉴턴의 작용-반작용, 라플라스의 결정론. 현재의 원인은 미래의 결과로 이어진다. 불법의 인과(因果) 사상과 물리학이 만나는 지점.", "url": "https://www.britannica.com/topic/causation"}, "w15": {"id": "w15", "title": "흐름 상태 (Flow State)", "field": "긍정심리학 — 칙센트미하이", "summary": "완전히 몰입한 상태에서 시간을 잊고 최고의 역량이 발휘된다. 창제(唱題) 시 경험하는 삼매(三昧)와 심리학적으로 유사.", "url": "https://www.britannica.com/topic/flow-state-psychology"}};
+const EASTERN = {"e1": {"id": "e1", "title": "의법불의인 (依法不依人)", "origin": "법화경·열반경", "cn": "依法不依人", "meaning": "법(진리)에 의지하되, 사람에 의지하지 말라.", "desc": "어떤 권위자의 말도 진리 앞에서는 검증되어야 한다. 맹목적 복종이 아닌 법 자체를 기준으로 삼는 태도.", "url": "https://www.nichirenlibrary.org/en/dic/"}, "e2": {"id": "e2", "title": "인부지이불온 (人不知而不慍)", "origin": "논어(論語) 학이편", "cn": "人不知而不慍，不亦君子乎", "meaning": "남이 나를 알아주지 않아도 성내지 않으니, 또한 군자가 아닌가.", "desc": "공자(孔子). 인정받지 못해도 내면의 평정을 잃지 않는 것이 군자의 덕목.", "url": "https://ctext.org/analects/xue-er"}, "e3": {"id": "e3", "title": "지족자부 (知足者富)", "origin": "도덕경(道德經) 33장", "cn": "知足者富", "meaning": "만족할 줄 아는 자가 부유하다.", "desc": "노자(老子). 욕망을 내려놓고 지금 있는 것에서 풍요를 발견하는 도가의 핵심.", "url": "https://ctext.org/dao-de-jing"}, "e4": {"id": "e4", "title": "불원인 (不怨天不尤人)", "origin": "논어(論語) 헌문편", "cn": "不怨天，不尤人", "meaning": "하늘을 원망하지 않고, 사람을 탓하지 않는다.", "desc": "공자. 외부를 탓하지 않고 자신에게서 원인을 찾는 자기 책임의 철학.", "url": "https://ctext.org/analects/xian-wen"}, "e5": {"id": "e5", "title": "호연지기 (浩然之氣)", "origin": "맹자(孟子) 공손추 상", "cn": "我善養吾浩然之氣", "meaning": "나는 나의 호연지기를 잘 기른다.", "desc": "맹자. 천지에 가득 찬 크고 굳센 기운. 올바른 도리를 꾸준히 실천할 때 쌓이는 내면의 힘.", "url": "https://ctext.org/mengzi/gong-sun-chou-i"}, "e6": {"id": "e6", "title": "천하무난사 (天下無難事)", "origin": "명심보감(明心寶鑑)", "cn": "天下無難事，只怕有心人", "meaning": "세상에 어려운 일은 없다. 오직 마음먹은 사람이 무서울 뿐.", "desc": "뜻을 세우고 꾸준히 나아가면 이루지 못할 것이 없다.", "url": "https://zh.wikisource.org/wiki/%E6%98%8E%E5%BF%83%E5%AF%B6%E9%91%91"}, "e7": {"id": "e7", "title": "상선약수 (上善若水)", "origin": "도덕경(道德經) 8장", "cn": "上善若水", "meaning": "최고의 선은 물과 같다.", "desc": "노자. 물처럼 다투지 않고 낮은 곳으로 흐르며 만물을 이롭게 한다. 겸손과 유연함의 덕목.", "url": "https://ctext.org/dao-de-jing"}, "e8": {"id": "e8", "title": "오일삼성 (吾日三省)", "origin": "논어(論語) 학이편", "cn": "吾日三省吾身", "meaning": "나는 날마다 세 가지로 나 자신을 반성한다.", "desc": "증자(曾子). 충실했는가, 신의를 지켰는가, 배운 것을 익혔는가를 매일 돌아보는 자기성찰.", "url": "https://ctext.org/analects/xue-er"}, "e9": {"id": "e9", "title": "무위자연 (無爲自然)", "origin": "도덕경(道德經)", "cn": "無爲而無不爲", "meaning": "함이 없으나 하지 않음이 없다.", "desc": "노자. 억지로 강요하지 않고 자연의 흐름을 따르면 모든 것이 이루어진다.", "url": "https://ctext.org/dao-de-jing"}, "e10": {"id": "e10", "title": "측은지심 (惻隱之心)", "origin": "맹자(孟子) 공손추 상", "cn": "惻隱之心，仁之端也", "meaning": "측은하게 여기는 마음이 인(仁)의 단서이다.", "desc": "맹자. 타인의 고통을 보고 불쌍히 여기는 마음이 인(仁)의 시작. 공감과 자비의 철학적 근거.", "url": "https://ctext.org/mengzi/gong-sun-chou-i"}, "e11": {"id": "e11", "title": "격물치지 (格物致知)", "origin": "대학(大學)", "cn": "格物而後知至", "meaning": "사물을 탐구한 뒤에 앎이 이르게 된다.", "desc": "주자학 핵심. 사물의 이치를 끝까지 탐구함으로써 지식과 지혜에 이른다.", "url": "https://ctext.org/liki/da-xue"}, "e12": {"id": "e12", "title": "제행무상 (諸行無常)", "origin": "불교 삼법인(三法印)", "cn": "諸行無常", "meaning": "모든 현상은 영원하지 않다.", "desc": "불교 근본 가르침. 영원하지 않은 것을 영원하다고 착각할 때 집착과 고통이 생긴다.", "url": "https://www.nichirenlibrary.org/en/dic/"}, "e13": {"id": "e13", "title": "사성제 (四聖諦)", "origin": "불교 근본 교설", "cn": "苦集滅道", "meaning": "괴로움, 그 원인, 소멸, 소멸에 이르는 길.", "desc": "석가모니가 깨달은 후 처음 설한 가르침. 고통의 존재(苦)와 원인(集)을 직시하고, 소멸(滅)과 그 길(道)을 통해 벗어날 수 있다는 불교의 근본 구조.", "url": "https://www.britannica.com/topic/Four-Noble-Truths"}, "e14": {"id": "e14", "title": "연기 (緣起)", "origin": "불교 근본 교설", "cn": "此有故彼有", "meaning": "이것이 있으므로 저것이 있다.", "desc": "모든 현상은 독립적으로 존재하지 않고 서로 조건이 되어 발생한다는 불교의 인과 구조. 고립된 실체란 없다는 관점.", "url": "https://www.britannica.com/topic/pratityasamutpada"}, "e15": {"id": "e15", "title": "공·중관 (空·中觀)", "origin": "중론(中論) — 용수(龍樹)", "cn": "因緣所生法 我說即是空", "meaning": "인연으로 생겨난 모든 것을 나는 공(空)이라 말한다.", "desc": "용수(나가르주나)가 체계화한 공 사상. 모든 존재는 고정된 실체(自性) 없이 조건에 의해 임시로 성립한다는 중관 철학의 핵심.", "url": "https://plato.stanford.edu/entries/nagarjuna/"}, "e16": {"id": "e16", "title": "즉심시불·평상심시도", "origin": "선종(禪宗) — 마조도일", "cn": "即心是佛 平常心是道", "meaning": "이 마음이 곧 부처이며, 평범한 일상의 마음이 곧 도(道)다.", "desc": "마조도일(709~788)의 대표 가르침. 깨달음은 특별한 경지가 아니라 지금 이 마음, 지금 이 일상 속에 있다는 선종의 통찰.", "url": "https://en.wikipedia.org/wiki/Mazu_Daoyi"}, "e17": {"id": "e17", "title": "범아일여 (梵我一如)", "origin": "우파니샤드·베단타", "cn": "Tat Tvam Asi (तत्त्वमसि)", "meaning": "너는 그것이다 — 개별 자아와 우주의 근본원리는 본래 하나다.", "desc": "찬도갸 우파니샤드에 반복되는 대선언(마하바키야). 개인의 참자아가 우주적 실재와 다르지 않다는 베단타 철학의 핵심.", "url": "https://www.britannica.com/topic/tat-tvam-asi"}, "e18": {"id": "e18", "title": "카르마 요가", "origin": "바가바드기타 2장", "cn": "Karmany evadhikaras te", "meaning": "행위할 권리는 있으나 그 결과에 대한 권리는 없다.", "desc": "크리슈나가 아르주나에게 전한 가르침. 결과에 대한 집착 없이 마땅히 해야 할 행위를 다하는 것이 참된 수행이라는 카르마 요가의 핵심.", "url": "https://www.britannica.com/topic/Bhagavad-Gita"}, "e19": {"id": "e19", "title": "중용 (中庸)", "origin": "중용(中庸) — 자사", "cn": "中也者 天下之大本也", "meaning": "중(中)이란 천하의 큰 근본이다.", "desc": "감정과 행동이 한쪽으로 치우치지 않고 마땅한 자리를 지키는 것. 유교에서 말하는 균형 잡힌 삶의 태도.", "url": "https://www.britannica.com/topic/Doctrine-of-the-Mean"}, "e20": {"id": "e20", "title": "극기복례 (克己復禮)", "origin": "논어(論語) 안연편", "cn": "克己復禮爲仁", "meaning": "자신을 이기고 예로 돌아가는 것이 인(仁)이다.", "desc": "공자. 사욕을 절제하고 예(禮)를 회복하는 것이 인(仁)을 실천하는 길이라는 가르침.", "url": "https://ctext.org/analects/yan-yuan"}, "e21": {"id": "e21", "title": "반자도지동 (反者道之動)", "origin": "도덕경(道德經) 40장", "cn": "反者道之動", "meaning": "되돌아가는 것이 도(道)의 움직임이다.", "desc": "노자. 모든 것은 극에 이르면 반대로 돌아간다는 순환의 이치. 고난도 극에 달하면 전환점을 맞는다는 시각과 통한다.", "url": "https://ctext.org/dao-de-jing"}, "e22": {"id": "e22", "title": "대교약졸 (大巧若拙)", "origin": "도덕경(道德經) 45장", "cn": "大巧若拙", "meaning": "큰 재주는 오히려 서툴러 보인다.", "desc": "노자. 진정한 뛰어남은 꾸밈없이 소박한 모습으로 드러난다는 도가적 미학.", "url": "https://ctext.org/dao-de-jing"}, "e23": {"id": "e23", "title": "궁즉변 변즉통", "origin": "주역(周易) 계사전", "cn": "窮則變 變則通 通則久", "meaning": "궁하면 변하고, 변하면 통하고, 통하면 오래간다.", "desc": "주역의 핵심 사상. 막다른 상황은 변화를 통해 새로운 길로 이어진다는 변화의 철학.", "url": "https://ctext.org/book-of-changes"}, "e24": {"id": "e24", "title": "제법무아 (諸法無我)", "origin": "불교 삼법인(三法印)", "cn": "諸法無我", "meaning": "모든 현상에는 고정된 자아(실체)가 없다.", "desc": "불교 근본 교설. '나'라고 여기는 것조차 조건에 따라 변하는 흐름일 뿐, 고정불변의 실체가 아니라는 통찰.", "url": "https://www.britannica.com/topic/anatta"}, "e25": {"id": "e25", "title": "자리이타 (自利利他)", "origin": "대승불교·보살행", "cn": "自利利他 円満成就", "meaning": "나를 이롭게 하는 것과 남을 이롭게 하는 것을 함께 원만히 이룬다.", "desc": "대승불교 보살도의 핵심 정신. 자신의 성불과 타인의 구제가 둘이 아니라는 관점.", "url": "https://www.britannica.com/topic/bodhisattva"}, "e26": {"id": "e26", "title": "화이부동 (和而不同)", "origin": "논어(論語) 자로편", "cn": "君子和而不同", "meaning": "군자는 조화를 이루되 같아지지 않는다.", "desc": "공자. 남과 어울리되 자신의 주체성과 원칙을 잃지 않는 것이 군자의 태도.", "url": "https://ctext.org/analects/zi-lu"}};
+const WESTERN = {"w1": {"id": "w1", "title": "양자 중첩 (Quantum Superposition)", "field": "양자역학", "summary": "관측 전 입자는 여러 상태를 동시에 가진다. 닐스 보어·하이젠베르크. 한 순간의 마음이 수천 가지 가능성을 품는다는 일념삼천(一念三千)과 구조적으로 유사하다.", "url": "https://www.britannica.com/science/quantum-mechanics-physics"}, "w2": {"id": "w2", "title": "관찰자 효과 (Observer Effect)", "field": "양자역학", "summary": "입자의 상태는 관측 행위 자체에 의해 결정된다. 내가 세계를 어떻게 바라보느냐가 세계를 바꾼다. 주관과 객관의 경계가 사라지는 지점.", "url": "https://www.britannica.com/science/observer-effect"}, "w3": {"id": "w3", "title": "엔트로피와 질서 (Entropy & Order)", "field": "열역학 제2법칙", "summary": "닫힌 계는 시간이 지날수록 무질서해진다. 그러나 에너지를 투입하면 국소적으로 질서가 생긴다. 수행과 노력이 혼돈 속에서 질서를 만드는 이유.", "url": "https://www.britannica.com/science/entropy-physics"}, "w4": {"id": "w4", "title": "신경가소성 (Neuroplasticity)", "field": "신경과학", "summary": "뇌는 경험과 훈련에 따라 구조와 기능을 재편한다. 반복적 수행이 실제로 뇌를 바꿀 수 있다는 과학적 근거. 숙명전환(宿命轉換)의 생물학적 메커니즘.", "url": "https://www.britannica.com/science/neuroplasticity"}, "w5": {"id": "w5", "title": "외상 후 성장 (Post-Traumatic Growth)", "field": "심리학", "summary": "테데스키·칼훈. 극심한 고난 후 오히려 이전보다 높은 심리적 성장이 일어난다. 숙명전환의 심리학적 대응 개념.", "url": "https://www.britannica.com/topic/post-traumatic-growth"}, "w6": {"id": "w6", "title": "나비 효과 (Butterfly Effect)", "field": "카오스 이론", "summary": "에드워드 로렌츠. 작은 초기 조건의 차이가 거대한 결과 차이를 만든다. 한 사람의 인간혁명(人間革命)이 사회 전체를 바꿀 수 있는 근거.", "url": "https://www.britannica.com/science/chaos-theory"}, "w7": {"id": "w7", "title": "무지의 지 (Socratic Ignorance)", "field": "서양철학 — 소크라테스", "summary": "나는 내가 모른다는 것을 안다. 자신의 무지를 아는 것이 지혜의 시작. 격물치지(格物致知)와 맥락이 통한다.", "url": "https://www.britannica.com/biography/Socrates"}, "w8": {"id": "w8", "title": "실존적 선택 (Sartrean Freedom)", "field": "실존주의 — 사르트르", "summary": "인간은 자유롭도록 선고받았다. 어떤 상황에서도 태도를 선택할 수 있다. 환경이 아닌 내면의 선택이 자신을 규정한다.", "url": "https://www.britannica.com/biography/Jean-Paul-Sartre"}, "w9": {"id": "w9", "title": "내면 통제 (Stoic Dichotomy of Control)", "field": "스토아 철학 — 에픽테토스", "summary": "우리가 통제할 수 있는 것(판단·욕구)과 없는 것(외부 사건)을 구분하라. 외부에 흔들리지 않는 내면의 요새.", "url": "https://www.britannica.com/topic/Stoicism"}, "w10": {"id": "w10", "title": "프랙탈 자기유사성 (Fractal Self-Similarity)", "field": "수학·복잡계", "summary": "만델브로트. 어떤 규모에서도 동일한 패턴이 반복된다. 묘법(妙法)이 우주의 모든 현상에 관통하는 하나의 법칙이라는 시각과 유사.", "url": "https://www.britannica.com/topic/fractal"}, "w11": {"id": "w11", "title": "밈 이론 (Memetics)", "field": "진화생물학 — 리처드 도킨스", "summary": "문화적 아이디어도 유전자처럼 복제·전파·진화한다. 광선유포(廣宣流布)의 문화적·생물학적 메커니즘.", "url": "https://www.britannica.com/topic/meme"}, "w12": {"id": "w12", "title": "의미치료 (Logotherapy)", "field": "실존심리학 — 빅터 프랭클", "summary": "어떤 고통에서도 의미를 찾는 것이 인간이다. 나치 수용소의 극한 상황에서 발견한 인간 존엄. 숙명전환의 심리학적 심층 근거.", "url": "https://www.britannica.com/biography/Viktor-Frankl"}, "w13": {"id": "w13", "title": "집단지성 (Collective Intelligence)", "field": "사회과학 — 피에르 레비", "summary": "개인의 지식을 넘어 집단이 연결될 때 더 높은 지혜가 출현한다. 이체동심(異體同心)의 사회과학적 구현.", "url": "https://www.britannica.com/topic/collective-intelligence"}, "w14": {"id": "w14", "title": "인과율 (Causality)", "field": "물리학·철학", "summary": "뉴턴의 작용-반작용, 라플라스의 결정론. 현재의 원인은 미래의 결과로 이어진다. 불법의 인과(因果) 사상과 물리학이 만나는 지점.", "url": "https://www.britannica.com/topic/causation"}, "w15": {"id": "w15", "title": "흐름 상태 (Flow State)", "field": "긍정심리학 — 칙센트미하이", "summary": "완전히 몰입한 상태에서 시간을 잊고 최고의 역량이 발휘된다. 창제(唱題) 시 경험하는 삼매(三昧)와 심리학적으로 유사.", "url": "https://www.britannica.com/topic/flow-state-psychology"}, "w16": {"id": "w16", "title": "일반상대성이론 (General Relativity)", "field": "물리학 — 아인슈타인", "summary": "질량이 시공간을 휘게 하고, 그 휜 시공간이 물체의 운동을 결정한다. 중력을 힘이 아닌 기하학적 구조로 재해석한 이론. 모든 것이 관계 속에서 서로 영향을 주고받는다는 시각과 통한다.", "url": "https://www.britannica.com/science/general-relativity"}, "w17": {"id": "w17", "title": "상보성 원리 (Complementarity)", "field": "물리학 — 닐스 보어", "summary": "빛은 입자이면서 동시에 파동이다. 서로 모순돼 보이는 두 성질이 실은 하나의 실재를 이루는 상호보완적 측면이라는 통찰. 이분법으로 나눌 수 없는 현상들에 대한 과학적 근거.", "url": "https://www.britannica.com/science/complementarity-principle"}, "w18": {"id": "w18", "title": "자연선택 (Natural Selection)", "field": "생물학 — 찰스 다윈", "summary": "환경에 더 잘 적응한 개체가 살아남아 자손을 남긴다. 생명은 고정된 것이 아니라 끊임없이 변화하며 적응해간다는 진화의 핵심 원리.", "url": "https://www.britannica.com/science/natural-selection"}, "w19": {"id": "w19", "title": "공생진화론 (Endosymbiotic Theory)", "field": "생물학 — 린 마굴리스", "summary": "세포 안의 미토콘드리아·엽록체는 원래 독립된 박테리아였으나 다른 세포와 공생하며 하나의 생명체로 통합됐다. 경쟁이 아닌 공생과 통합이 생명 진화의 핵심 동력이었다는 관점.", "url": "https://www.britannica.com/biography/Lynn-Margulis"}, "w20": {"id": "w20", "title": "항상성 (Homeostasis)", "field": "생리학 — 월터 캐넌", "summary": "생명체는 외부 변화 속에서도 체온·pH 등 내부 상태를 일정하게 유지하려 한다. 흔들림 속에서도 균형을 되찾는 생명의 자기조절 능력.", "url": "https://www.britannica.com/science/homeostasis"}, "w21": {"id": "w21", "title": "거울뉴런 (Mirror Neurons)", "field": "신경과학 — 자코모 리촐라티", "summary": "타인의 행동을 볼 때도 마치 내가 그 행동을 하는 것처럼 반응하는 신경세포. 공감과 이해가 뇌 차원에서 이미 준비되어 있다는 과학적 근거.", "url": "https://www.britannica.com/science/mirror-neuron"}, "w22": {"id": "w22", "title": "성장 마인드셋 (Growth Mindset)", "field": "심리학 — 캐럴 드웩", "summary": "능력은 타고나는 것이 아니라 노력과 경험으로 자랄 수 있다고 믿는 태도. 실패를 좌절이 아닌 성장의 재료로 재해석하는 심리학적 근거.", "url": "https://ctl.stanford.edu/students/growth-mindset"}, "w23": {"id": "w23", "title": "자기실현 (Self-Actualization)", "field": "심리학 — 에이브러햄 매슬로", "summary": "인간의 욕구는 생존과 안전을 지나 궁극적으로 자기 잠재력을 온전히 실현하려는 방향으로 나아간다. 인간 성장의 최상위 단계에 대한 심리학적 모델.", "url": "https://www.britannica.com/science/self-actualization"}, "w24": {"id": "w24", "title": "정언명령 (Categorical Imperative)", "field": "서양철학 — 임마누엘 칸트", "summary": "네 행동의 원칙이 누구에게나 적용될 보편 법칙이 될 수 있도록 행동하라. 결과가 아니라 행위 자체의 도덕적 원칙을 기준으로 삼는 의무론적 윤리.", "url": "https://www.britannica.com/topic/categorical-imperative"}, "w25": {"id": "w25", "title": "불완전성 정리 (Incompleteness Theorems)", "field": "수학·논리학 — 쿠르트 괴델", "summary": "어떤 형식체계도 그 자체 안에서 모든 참인 명제를 증명할 수는 없다. 어떤 논리 체계도 스스로를 완전히 정당화할 수 없다는 근본적 한계에 대한 통찰.", "url": "https://www.britannica.com/biography/Kurt-Godel"}, "w26": {"id": "w26", "title": "만물유전 (Panta Rhei)", "field": "서양철학 — 헤라클레이토스", "summary": "같은 강물에 두 번 발을 담글 수 없다. 세상 모든 것은 끊임없이 흐르고 변한다는 고대 그리스 철학의 통찰. 제행무상(諸行無常)과 구조적으로 맞닿아 있다.", "url": "https://www.britannica.com/biography/Heraclitus-of-Ephesus"}, "w27": {"id": "w27", "title": "사회적 자본 (Social Capital)", "field": "사회과학 — 로버트 퍼트넘", "summary": "사람들 사이의 신뢰와 협력의 관계망이 사회 전체의 힘이 된다. 개인의 성취를 넘어 공동체의 유대가 만드는 사회적 가치에 대한 이론.", "url": "https://www.britannica.com/topic/social-capital"}, "w28": {"id": "w28", "title": "현상학적 판단중지 (Epoché)", "field": "서양철학 — 에드문트 후설", "summary": "세계에 대한 습관적 판단과 선입견을 잠시 괄호치고 있는 그대로의 경험 자체를 들여다보는 방법. 관찰이 관점에 따라 달라진다는 통찰의 철학적 뿌리.", "url": "https://plato.stanford.edu/entries/husserl/"}, "w29": {"id": "w29", "title": "테세우스의 배 (Ship of Theseus)", "field": "서양철학 — 정체성의 역설", "summary": "배의 부품을 하나씩 다 바꿔도 그것은 여전히 같은 배인가? 변화 속에서 '나'라는 정체성이 어떻게 유지되는지를 묻는 고전적 사고실험.", "url": "https://plato.stanford.edu/entries/identity-personal/"}, "w30": {"id": "w30", "title": "6단계 분리 (Six Degrees of Separation)", "field": "사회연결망 이론", "summary": "지구상 임의의 두 사람은 평균 6단계의 지인 관계로 연결될 수 있다는 이론. 개인은 고립된 존재가 아니라 거대한 관계망의 일부라는 근거.", "url": "https://www.britannica.com/topic/six-degrees-of-separation"}};
+
+// ── Gemini 임베딩 (의미 기반 매칭) ──
+const EMBED_MODEL = 'gemini-embedding-001';
+const EMBED_DIM = 768;
+const CORPUS_VERSION = 'v2'; // DB 확장(동양철학·서양과학 항목 대폭 추가) — 버전 올려서 캐시 재계산
+
+function normalizeVec(v) {
+  let norm = Math.sqrt(v.reduce(function(s,x){return s+x*x;},0));
+  if (!norm) return v;
+  return v.map(function(x){return x/norm;});
+}
+function cosineSim(a,b) {
+  let dot=0; for (let i=0;i<a.length;i++) dot += a[i]*(b[i]||0);
+  return dot; // 두 벡터 모두 정규화되어 있으므로 내적 = 코사인 유사도
+}
+function simpleHash(str) {
+  let h=0; for (let i=0;i<str.length;i++) { h=(Math.imul(31,h)+str.charCodeAt(i))|0; }
+  return h.toString(36);
+}
+
+async function embedText(text, taskType) {
+  const key = localStorage.getItem('bf_gemini_key');
+  if (!key) throw new Error('설정 탭에서 Gemini API 키를 먼저 입력해줘요 🔑');
+  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+EMBED_MODEL+':embedContent?key='+key, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      content: { parts:[{ text: String(text).slice(0,2000) }] },
+      taskType: taskType || 'SEMANTIC_SIMILARITY',
+      outputDimensionality: EMBED_DIM
+    })
+  });
+  if (!res.ok) { const e = await res.json().catch(function(){return {};}); throw new Error(e.error?.message || '임베딩 오류'); }
+  const d = await res.json();
+  return normalizeVec(d.embedding.values);
+}
+
+// 여러 텍스트를 한 번에 임베딩 (배치 실패 시 순차 호출로 자동 대체)
+async function embedBatch(texts, taskType) {
+  const key = localStorage.getItem('bf_gemini_key');
+  if (!key) throw new Error('설정 탭에서 Gemini API 키를 먼저 입력해줘요 🔑');
+  const requests = texts.map(function(t) {
+    return {
+      model: 'models/'+EMBED_MODEL,
+      content: { parts:[{ text: String(t).slice(0,2000) }] },
+      taskType: taskType || 'RETRIEVAL_DOCUMENT',
+      outputDimensionality: EMBED_DIM
+    };
+  });
+  try {
+    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+EMBED_MODEL+':batchEmbedContents?key='+key, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ requests: requests })
+    });
+    if (!res.ok) throw new Error('batch 실패');
+    const d = await res.json();
+    if (!d.embeddings) throw new Error('batch 응답 형식 오류');
+    return d.embeddings.map(function(e){ return normalizeVec(e.values); });
+  } catch(batchErr) {
+    // 배치 엔드포인트가 안 되면 하나씩 순차 호출
+    const out = [];
+    for (let i=0;i<texts.length;i++) {
+      out.push(await embedText(texts[i], taskType || 'RETRIEVAL_DOCUMENT'));
+    }
+    return out;
+  }
+}
+
+// 고정 DB(어서·동양철학·서양과학) 임베딩 — 최초 1회만 계산 후 localStorage 캐시
+async function getCorpusEmbeddings() {
+  const cacheKey = 'bf_corpus_embed_' + CORPUS_VERSION;
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) { try { const parsed = JSON.parse(cached); if (parsed && parsed.length) return parsed; } catch(e){} }
+  const items = [];
+  GOSHO.forEach(function(g,i){ items.push({ type:'gosho', id:i, text: g.kr+' '+g.en+' '+g.source }); });
+  Object.values(EASTERN).forEach(function(e){ items.push({ type:'eastern', id:e.id, text: e.title+' '+e.meaning+' '+e.desc }); });
+  Object.values(WESTERN).forEach(function(w){ items.push({ type:'western', id:w.id, text: w.title+' '+w.summary }); });
+  const vectors = await embedBatch(items.map(function(x){return x.text;}), 'RETRIEVAL_DOCUMENT');
+  const result = items.map(function(it,i){ return { type:it.type, id:it.id, vec:vectors[i] }; });
+  localStorage.setItem(cacheKey, JSON.stringify(result));
+  return result;
+}
+
+// 내 신심일기 어서·스피치 임베딩 — uid별 캐시, 새 항목만 추가 계산
+async function embedPersonalData() {
+  const fd = window._fbData || { gosho:[], speeches:[] };
+  const all = fd.gosho.map(function(x){ return Object.assign({_kind:'gosho'}, x); })
+    .concat(fd.speeches.map(function(x){ return Object.assign({_kind:'speech'}, x); }));
+  if (!all.length) return [];
+  const uid = window._fbUid || 'anon';
+  const cacheKey = 'bf_personal_embed_' + uid;
+  let cache = {};
+  try { cache = JSON.parse(localStorage.getItem(cacheKey) || '{}'); } catch(e){}
+  const hashes = all.map(function(it){ return simpleHash(it.content); });
+  const toEmbedIdx = [];
+  all.forEach(function(it,i){ if (!cache[hashes[i]]) toEmbedIdx.push(i); });
+  for (let i=0;i<toEmbedIdx.length;i+=20) {
+    const chunk = toEmbedIdx.slice(i,i+20);
+    const vecs = await embedBatch(chunk.map(function(idx){ return all[idx].content; }), 'RETRIEVAL_DOCUMENT');
+    chunk.forEach(function(idx,j){ cache[hashes[idx]] = vecs[j]; });
+  }
+  localStorage.setItem(cacheKey, JSON.stringify(cache));
+  return all.map(function(it,i){ return Object.assign({}, it, { vec: cache[hashes[i]] }); });
+}
+
+function findMatchEmbed(items, diaryVec) {
+  if (!items || !items.length || !diaryVec) return null;
+  let best=null, bestScore=-1;
+  items.forEach(function(it) {
+    if (!it.vec) return;
+    const s = cosineSim(it.vec, diaryVec);
+    if (s > bestScore) { bestScore = s; best = it; }
+  });
+  return (best && bestScore > 0.35) ? best : null;
+}
 
 const _GH = {
   'Jua':'https://raw.githubusercontent.com/myelinqueen-blip/The-Mystic-Mirror/main/fonts/Jua.woff2','Gowun_Dodum':'https://raw.githubusercontent.com/myelinqueen-blip/The-Mystic-Mirror/main/fonts/GowunDodum.woff2',
@@ -498,43 +614,6 @@ async function callGemini(prompt, system) {
   return d.candidates?.[0]?.content?.parts?.[0]?.text || '';
 }
 
-const AI_SYS = `당신은 일기 내용을 분석해 관련 항목 인덱스를 선택하는 역할만 합니다. 칭찬·해석·격려 없음.
-
-아래 DB에서 일기와 가장 관련된 항목을 선택해 JSON만 반환하세요.
-
-[어서 DB 0~9]
-0:겨울→봄(희망,고난) 1:사자후(병,건강) 2:마음의보물(마음,가치) 3:고락(일상,행복)
-4:용기의강검(용기,두려움) 5:꿈에불과(걱정,불안) 6:중요한것은마음(신심,기도)
-7:한없는공덕(수행,노력) 8:마음만은(주체,환경) 9:말함으로써(대화,전법)
-
-[동양철학 e1~e12]
-e1:의법불의인(믿음,권위) e2:인부지이불온(인정,서운) e3:지족자부(욕심,만족)
-e4:불원인(원망,탓) e5:호연지기(용기,기백) e6:천하무난사(어려움,의지)
-e7:상선약수(겸손,유연) e8:오일삼성(반성,성찰) e9:무위자연(억지,흐름)
-e10:측은지심(공감,자비) e11:격물치지(배움,탐구) e12:제행무상(변화,무상)
-
-[서양과학철학 w1~w15]
-w1:양자중첩(가능성,마음) w2:관찰자효과(인식,관점) w3:엔트로피(노력,질서)
-w4:신경가소성(변화,습관) w5:외상후성장(고난,성장) w6:나비효과(영향,변화)
-w7:무지의지(배움,겸손) w8:실존적선택(선택,자유) w9:스토아내면(불안,평정)
-w10:프랙탈(우주,진리) w11:밈이론(전파,문화) w12:의미치료(의미,고통)
-w13:집단지성(함께,연대) w14:인과율(원인,결과) w15:흐름상태(몰입,집중)
-
-반환(JSON만):
-{"gosho_id":숫자,"eastern_ids":["e1","e2","e3"],"western_ids":["w1","w2","w3"]}`;
-
-function findMatch(items, diary) {
-  if (!items || !items.length) return null;
-  let best=null, score=0;
-  items.forEach(function(item) {
-    let s=0;
-    const text=(item.content+' '+(item.tags||[]).join(' ')+' '+item.category).toLowerCase();
-    diary.split(/[\s,.!?]/).forEach(function(w) { if(w.length>1 && text.includes(w)) s++; });
-    if(s>score){ score=s; best=item; }
-  });
-  return best;
-}
-
 function setStep(id,s) { document.getElementById(id).className='step '+s; }
 function sleep(ms) { return new Promise(function(r){setTimeout(r,ms);}); }
 function showErr(m) { var e=document.getElementById('errBox'); e.textContent=m; e.classList.add('on'); }
@@ -552,32 +631,25 @@ async function analyze() {
 
   try {
     setStep('s1','active');
-    const raw = await callGemini('일기: '+diary, AI_SYS);
-    let p;
-    try {
-      console.log('AI 원본 응답:', raw);
-      // 백틱 코드블록 제거 후 JSON 추출
-      let cleaned = raw;
-      cleaned = cleaned.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
-      // JSON 객체 추출
-      const start = cleaned.indexOf('{');
-      const end = cleaned.lastIndexOf('}');
-      if (start !== -1 && end !== -1) {
-        cleaned = cleaned.slice(start, end + 1);
-      }
-      p = JSON.parse(cleaned);
-      console.log('파싱 성공:', p);
-    } catch(err) {
-      console.error('JSON 파싱 오류:', err.message, '\n원본:', raw);
-      throw new Error('AI 응답 파싱 실패. 다시 시도해줘요.');
-    }
+    // 일기 임베딩 + 고정 DB(어서·동양철학·서양과학) 임베딩 간 의미 유사도로 매칭
+    const diaryVec = await embedText(diary, 'RETRIEVAL_QUERY');
+    const corpus = await getCorpusEmbeddings();
+    const scored = corpus.map(function(c){ return Object.assign({}, c, { s: cosineSim(c.vec, diaryVec) }); });
+    const goshoScored = scored.filter(function(c){return c.type==='gosho';}).sort(function(a,b){return b.s-a.s;});
+    const easternScored = scored.filter(function(c){return c.type==='eastern';}).sort(function(a,b){return b.s-a.s;});
+    const westernScored = scored.filter(function(c){return c.type==='western';}).sort(function(a,b){return b.s-a.s;});
+    const p = {
+      gosho_id: goshoScored.length ? goshoScored[0].id : 0,
+      eastern_ids: easternScored.slice(0,3).map(function(c){return c.id;}),
+      western_ids: westernScored.slice(0,3).map(function(c){return c.id;})
+    };
     setStep('s1','done');
 
-    // 내 Firebase 데이터
+    // 내 Firebase 데이터 (임베딩 기반 의미 매칭)
     setStep('s2','active');
-    const fd = window._fbData || {gosho:[],speeches:[]};
-    const myGosho = findMatch(fd.gosho, diary);
-    const mySpeech = findMatch(fd.speeches, diary);
+    const personalItems = await embedPersonalData();
+    const myGosho = findMatchEmbed(personalItems.filter(function(x){return x._kind==='gosho';}), diaryVec);
+    const mySpeech = findMatchEmbed(personalItems.filter(function(x){return x._kind==='speech';}), diaryVec);
     const fbSec = document.getElementById('firebaseSection');
     fbSec.innerHTML = '';
     if (myGosho || mySpeech) {
