@@ -356,7 +356,10 @@ onAuthStateChanged(auth, async function(user) {
     if (logoutBtn) logoutBtn.style.display = 'block';
     if (badge) badge.innerHTML = '<span class="firebase-badge on">🔥 신심일기 연동됨</span>';
     try {
-      const snap = await get(ref(db, 'users/' + user.uid));
+      // DB 구조 확인 후 올바른 경로로 읽기
+    // 루트 키: books, chanjeSettings, records, shinGoal
+    // records 안에 어서·스피치가 있을 것으로 추정
+    const snap = await get(ref(db, '/'));
       if (!snap.exists()) return;
       function collect(obj, cat, depth) {
         if (depth > 8 || !obj || typeof obj !== 'object') return;
