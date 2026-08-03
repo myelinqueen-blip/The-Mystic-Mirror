@@ -431,7 +431,7 @@ async function callGemini(prompt, system) {
   if (!key) throw new Error('설정 탭에서 Gemini API 키를 먼저 입력해줘요 🔑');
   const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key, {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ system_instruction:{parts:[{text:system}]}, contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.5,maxOutputTokens:500} })
+    body:JSON.stringify({ system_instruction:{parts:[{text:system}]}, contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.1,maxOutputTokens:400} })
   });
   if (!res.ok) { const e=await res.json().catch(function(){return {}}); throw new Error(e.error?.message||'Gemini 오류'); }
   const d = await res.json();
@@ -493,7 +493,15 @@ async function analyze() {
   try {
     setStep('s1','active');
     const raw = await callGemini('일기: '+diary, AI_SYS);
-    const p = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    let p;
+    try {
+      const cleaned = raw.replace(/```json/g,'').replace(/```/g,'').trim();
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      p = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
+    } catch(err) {
+      console.error('JSON 파싱 오류:', raw);
+      throw new Error('AI 응답 파싱 실패. 다시 시도해줘요.');
+    }
     setStep('s1','done');
 
     // 내 Firebase 데이터
