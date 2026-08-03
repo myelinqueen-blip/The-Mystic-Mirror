@@ -391,22 +391,27 @@ onAuthStateChanged(auth, async function(user) {
         });
       }
 
-      // 스피치: speech/{index}
-      const speechSnap = await get(ref(db, 'users/' + user.uid + '/speech'));
-      if (speechSnap.exists()) {
-        const speeches = speechSnap.val();
-        console.log('speech 개수:', Object.keys(speeches).length);
-        Object.values(speeches).forEach(function(item) {
-          const txt = item && (item.content || item.text || item.memo || item.body || '');
-          if (txt && txt.length > 5) {
-            window._fbData.speeches.push({
-              content: txt,
-              category: item.category || item.folder || item.tag || '',
-              source: item.source || item.ref || '',
-              tags: item.tags || item.keywords || []
+      // 스피치: records/{날짜}/speech/{index}/text
+      const recordsSnap = await get(ref(db, 'users/' + user.uid + '/records'));
+      if (recordsSnap.exists()) {
+        const records = recordsSnap.val();
+        Object.entries(records).forEach(function(dateEntry) {
+          const dateData = dateEntry[1];
+          if (dateData && dateData.speech) {
+            Object.values(dateData.speech).forEach(function(item) {
+              const txt = item && (item.text || item.content || item.memo || '');
+              if (txt && txt.length > 5) {
+                window._fbData.speeches.push({
+                  content: txt,
+                  category: dateEntry[0],
+                  source: dateEntry[0],
+                  tags: item.keywords || []
+                });
+              }
             });
           }
         });
+        console.log('스피치 로드 완료:', window._fbData.speeches.length);
       }
       console.log('Firebase 로드 완료 — 어서:', window._fbData.gosho.length, '스피치:', window._fbData.speeches.length);
       if (window._fbData.gosho.length > 0) console.log('어서 샘플:', window._fbData.gosho[0].content.slice(0,50));
@@ -486,7 +491,7 @@ async function callGemini(prompt, system) {
   if (!key) throw new Error('설정 탭에서 Gemini API 키를 먼저 입력해줘요 🔑');
   const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key, {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ system_instruction:{parts:[{text:system}]}, contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.1,maxOutputTokens:800} })
+    body:JSON.stringify({ system_instruction:{parts:[{text:system}]}, contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.1,maxOutputTokens:1024} })
   });
   if (!res.ok) { const e=await res.json().catch(function(){return {}}); throw new Error(e.error?.message||'Gemini 오류'); }
   const d = await res.json();
