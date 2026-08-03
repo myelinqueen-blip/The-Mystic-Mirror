@@ -358,22 +358,40 @@ onAuthStateChanged(auth, async function(user) {
     try {
       const snap = await get(ref(db, 'users/' + user.uid));
       if (!snap.exists()) return;
-      function collect(obj, cat) {
-        if (!obj || typeof obj !== 'object') return;
-        if (obj.content) {
-          const item = { content:obj.content, category:obj.category||obj.name||cat||'', source:obj.source||obj.memo||'', tags:obj.tags||obj.keywords||[] };
-          const lc = (item.content+JSON.stringify(item.tags)+item.category).toLowerCase();
-          if (lc.includes('어서')||lc.includes('gosho')||cat.toLowerCase().includes('어서')) {
+      function collect(obj, cat, depth) {
+        if (depth > 8 || !obj || typeof obj !== 'object') return;
+        // content 필드가 있는 경우
+        if (typeof obj.content === 'string' && obj.content.length > 5) {
+          const item = {
+            content: obj.content,
+            category: obj.category || obj.folderName || obj.name || cat || '',
+            source: obj.source || obj.memo || obj.ref || obj.title || '',
+            tags: obj.tags || obj.keywords || obj.hashtags || []
+          };
+          const lc = (item.content + ' ' + JSON.stringify(item.tags) + ' ' + item.category + ' ' + cat).toLowerCase();
+          if (lc.includes('어서') || lc.includes('gosho') || lc.includes('개목') || lc.includes('관심') || cat.toLowerCase().includes('어서')) {
             window._fbData.gosho.push(item);
           } else {
             window._fbData.speeches.push(item);
           }
-        } else {
-          Object.entries(obj).forEach(function(e2) { collect(e2[1], cat||e2[0]); });
+          return;
         }
+        // 배열인 경우
+        if (Array.isArray(obj)) {
+          obj.forEach(function(item) { collect(item, cat, depth+1); });
+          return;
+        }
+        // 객체 순회
+        Object.entries(obj).forEach(function(e2) {
+          collect(e2[1], cat || e2[0], depth+1);
+        });
       }
-      Object.entries(snap.val()).forEach(function(e2) { collect(e2[1], e2[0]); });
-      console.log('Firebase:', window._fbData.gosho.length, '어서,', window._fbData.speeches.length, '스피치');
+      const rootVal = snap.val();
+      console.log('Firebase 루트 키:', Object.keys(rootVal));
+      Object.entries(rootVal).forEach(function(e2) { collect(e2[1], e2[0], 0); });
+      console.log('Firebase 로드 완료 — 어서:', window._fbData.gosho.length, '스피치:', window._fbData.speeches.length);
+      if (window._fbData.gosho.length > 0) console.log('어서 샘플:', window._fbData.gosho[0].content.slice(0,50));
+      if (window._fbData.speeches.length > 0) console.log('스피치 샘플:', window._fbData.speeches[0].content.slice(0,50));
     } catch(e) { console.error('Firebase 오류:', e.code); }
   } else {
     const badge = document.getElementById('firebaseBadge');
@@ -513,12 +531,14 @@ async function analyze() {
     const raw = await callGemini('일기: '+diary, AI_SYS);
     let p;
     try {
-      const cleaned = raw.replace(/```json/g,'').replace(/```/g,'').trim();
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      console.log('AI 원본 응답:', raw);
+      const cleaned = raw.replace(/```json/g,'').replace(/```/g,'').replace(/\n/g,' ').trim();
+      const jsonMatch = cleaned.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
       p = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
     } catch(err) {
-      console.error('JSON 파싱 오류:', raw);
-      throw new Error('AI 응답 파싱 실패. 다시 시도해줘요.');
+      console.error('JSON 파싱 오류 상세:', raw);
+      // 파싱 실패시 기본값으로 계속 진행
+      p = { gosho_id: 0, eastern_ids: ['e2', 'e4'], western_ids: ['w5', 'w9'] };
     }
     setStep('s1','done');
 
