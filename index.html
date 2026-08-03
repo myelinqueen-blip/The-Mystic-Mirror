@@ -418,6 +418,8 @@ onAuthStateChanged(auth, async function(user) {
       console.log('Firebase 로드 완료 — 어서:', window._fbData.gosho.length, '스피치:', window._fbData.speeches.length);
       if (window._fbData.gosho.length > 0) console.log('어서 샘플:', window._fbData.gosho[0].content.slice(0,50));
       if (window._fbData.speeches.length > 0) console.log('스피치 샘플:', window._fbData.speeches[0].content.slice(0,50));
+      // 로그인 직후부터 백그라운드에서 조금씩 임베딩을 준비해둠 (분석 화면에서 오래 기다리지 않도록)
+      setTimeout(function(){ if (window._continuePersonalEmbeddingInBackground) window._continuePersonalEmbeddingInBackground(); }, 1000);
     } catch(e) { console.error('Firebase 오류:', e.code); }
   } else {
     const badge = document.getElementById('firebaseBadge');
@@ -455,9 +457,20 @@ function simpleHash(str) {
   return h.toString(36);
 }
 
-async function embedText(text, taskType) {
+// ── 전역 속도 제한 (무료 티어 쿼터 보호: embed_content 분당 100건 한도보다 여유 있게) ──
+let _embedNextAvailable = 0;
+const EMBED_INTERVAL_MS = 700; // 요청 사이 최소 간격 → 분당 약 85건, 100건 한도 아래로 여유
+function _embedWait() {
+  const now = Date.now();
+  const wait = Math.max(0, _embedNextAvailable - now);
+  _embedNextAvailable = Math.max(now, _embedNextAvailable) + EMBED_INTERVAL_MS;
+  return wait > 0 ? sleep(wait) : Promise.resolve();
+}
+
+async function embedText(text, taskType, _retry) {
   const key = localStorage.getItem('bf_gemini_key');
   if (!key) throw new Error('설정 탭에서 Gemini API 키를 먼저 입력해줘요 🔑');
+  await _embedWait();
   const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+EMBED_MODEL+':embedContent?key='+key, {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
@@ -466,44 +479,34 @@ async function embedText(text, taskType) {
       outputDimensionality: EMBED_DIM
     })
   });
-  if (!res.ok) { const e = await res.json().catch(function(){return {};}); throw new Error(e.error?.message || '임베딩 오류'); }
+  if (!res.ok) {
+    const e = await res.json().catch(function(){return {};});
+    const msg = e.error?.message || ('임베딩 오류 '+res.status);
+    // 429(할당량 초과)면 서버가 알려준 대기시간만큼 쉬었다가 자동 재시도
+    if (res.status === 429 && (_retry||0) < 6) {
+      const m = msg.match(/retry in ([\d.]+)s/i);
+      const wait = m ? Math.ceil(parseFloat(m[1])*1000)+800 : ((_retry||0)+1)*10000;
+      await sleep(wait);
+      return embedText(text, taskType, (_retry||0)+1);
+    }
+    throw new Error(msg);
+  }
   const d = await res.json();
   return normalizeVec(d.embedding.values);
 }
 
-// 여러 텍스트를 한 번에 임베딩 (배치 실패 시 순차 호출로 자동 대체)
-async function embedBatch(texts, taskType) {
-  const key = localStorage.getItem('bf_gemini_key');
-  if (!key) throw new Error('설정 탭에서 Gemini API 키를 먼저 입력해줘요 🔑');
-  const requests = texts.map(function(t) {
-    return {
-      model: 'models/'+EMBED_MODEL,
-      content: { parts:[{ text: String(t).slice(0,2000) }] },
-      taskType: taskType || 'RETRIEVAL_DOCUMENT',
-      outputDimensionality: EMBED_DIM
-    };
-  });
-  try {
-    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+EMBED_MODEL+':batchEmbedContents?key='+key, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ requests: requests })
-    });
-    if (!res.ok) throw new Error('batch 실패');
-    const d = await res.json();
-    if (!d.embeddings) throw new Error('batch 응답 형식 오류');
-    return d.embeddings.map(function(e){ return normalizeVec(e.values); });
-  } catch(batchErr) {
-    // 배치 엔드포인트가 안 되면 하나씩 순차 호출
-    const out = [];
-    for (let i=0;i<texts.length;i++) {
-      out.push(await embedText(texts[i], taskType || 'RETRIEVAL_DOCUMENT'));
-    }
-    return out;
+// 여러 텍스트를 순차 임베딩 (전역 속도 제한 + 429 자동 재시도가 embedText에 내장돼 있어 안전)
+async function embedBatch(texts, taskType, onProgress) {
+  const out = [];
+  for (let i=0;i<texts.length;i++) {
+    out.push(await embedText(texts[i], taskType || 'RETRIEVAL_DOCUMENT'));
+    if (onProgress) onProgress(i+1, texts.length);
   }
+  return out;
 }
 
 // 고정 DB(어서·동양철학·서양과학) 임베딩 — 최초 1회만 계산 후 localStorage 캐시
-async function getCorpusEmbeddings() {
+async function getCorpusEmbeddings(onProgress) {
   const cacheKey = 'bf_corpus_embed_' + CORPUS_VERSION;
   const cached = localStorage.getItem(cacheKey);
   if (cached) { try { const parsed = JSON.parse(cached); if (parsed && parsed.length) return parsed; } catch(e){} }
@@ -511,14 +514,17 @@ async function getCorpusEmbeddings() {
   GOSHO.forEach(function(g,i){ items.push({ type:'gosho', id:i, text: g.kr+' '+g.en+' '+g.source }); });
   Object.values(EASTERN).forEach(function(e){ items.push({ type:'eastern', id:e.id, text: e.title+' '+e.meaning+' '+e.desc }); });
   Object.values(WESTERN).forEach(function(w){ items.push({ type:'western', id:w.id, text: w.title+' '+w.summary }); });
-  const vectors = await embedBatch(items.map(function(x){return x.text;}), 'RETRIEVAL_DOCUMENT');
+  const vectors = await embedBatch(items.map(function(x){return x.text;}), 'RETRIEVAL_DOCUMENT', onProgress);
   const result = items.map(function(it,i){ return { type:it.type, id:it.id, vec:vectors[i] }; });
   localStorage.setItem(cacheKey, JSON.stringify(result));
   return result;
 }
 
-// 내 신심일기 어서·스피치 임베딩 — uid별 캐시, 새 항목만 추가 계산
-async function embedPersonalData() {
+// 한 번 호출당 새로 임베딩할 최대 개수 (분석 화면이 너무 오래 멈추지 않도록 제한, 나머지는 다음 호출/백그라운드에서 이어서 처리)
+const MAX_PERSONAL_EMBED_PER_CALL = 60;
+
+// 내 신심일기 어서·스피치 임베딩 — uid별 캐시, 새 항목만 추가 계산 (중단돼도 이미 처리한 만큼은 즉시 저장)
+async function embedPersonalData(onProgress) {
   const fd = window._fbData || { gosho:[], speeches:[] };
   const all = fd.gosho.map(function(x){ return Object.assign({_kind:'gosho'}, x); })
     .concat(fd.speeches.map(function(x){ return Object.assign({_kind:'speech'}, x); }));
@@ -530,13 +536,44 @@ async function embedPersonalData() {
   const hashes = all.map(function(it){ return simpleHash(it.content); });
   const toEmbedIdx = [];
   all.forEach(function(it,i){ if (!cache[hashes[i]]) toEmbedIdx.push(i); });
-  for (let i=0;i<toEmbedIdx.length;i+=20) {
-    const chunk = toEmbedIdx.slice(i,i+20);
-    const vecs = await embedBatch(chunk.map(function(idx){ return all[idx].content; }), 'RETRIEVAL_DOCUMENT');
-    chunk.forEach(function(idx,j){ cache[hashes[idx]] = vecs[j]; });
+  const runIdx = toEmbedIdx.slice(0, MAX_PERSONAL_EMBED_PER_CALL);
+  let done = 0;
+  for (let i=0;i<runIdx.length;i++) {
+    const idx = runIdx[i];
+    try {
+      cache[hashes[idx]] = await embedText(all[idx].content, 'RETRIEVAL_DOCUMENT');
+    } catch(e) {
+      console.error('개인 데이터 임베딩 실패(건너뜀):', e.message);
+    }
+    done++;
+    if (onProgress) onProgress(done, runIdx.length, toEmbedIdx.length);
+    if (done % 8 === 0) localStorage.setItem(cacheKey, JSON.stringify(cache)); // 중간중간 저장 (끊겨도 유실 최소화)
   }
   localStorage.setItem(cacheKey, JSON.stringify(cache));
   return all.map(function(it,i){ return Object.assign({}, it, { vec: cache[hashes[i]] }); });
+}
+
+// 로그인 직후 화면과 무관하게 백그라운드에서 조금씩 이어서 임베딩 (다음 방문 때는 대부분 이미 준비돼 있도록)
+window._embedBackgroundRunning = false;
+async function _continuePersonalEmbeddingInBackground() {
+  if (window._embedBackgroundRunning) return;
+  window._embedBackgroundRunning = true;
+  try {
+    for (let round=0; round<30; round++) {
+      const fd = window._fbData || { gosho:[], speeches:[] };
+      const total = fd.gosho.length + fd.speeches.length;
+      if (!total) break;
+      const uid = window._fbUid || 'anon';
+      let cache = {};
+      try { cache = JSON.parse(localStorage.getItem('bf_personal_embed_'+uid) || '{}'); } catch(e){}
+      const all = fd.gosho.concat(fd.speeches);
+      const remaining = all.filter(function(it){ return !cache[simpleHash(it.content)]; }).length;
+      if (!remaining) break;
+      await embedPersonalData();
+      await sleep(1500);
+    }
+  } catch(e) { console.error('백그라운드 임베딩 오류:', e.message); }
+  window._embedBackgroundRunning = false;
 }
 
 function findMatchEmbed(items, diaryVec) {
@@ -549,6 +586,7 @@ function findMatchEmbed(items, diaryVec) {
   });
   return (best && bestScore > 0.35) ? best : null;
 }
+
 
 const _GH = {
   'Jua':'https://raw.githubusercontent.com/myelinqueen-blip/The-Mystic-Mirror/main/fonts/Jua.woff2','Gowun_Dodum':'https://raw.githubusercontent.com/myelinqueen-blip/The-Mystic-Mirror/main/fonts/GowunDodum.woff2',
@@ -633,7 +671,9 @@ async function analyze() {
     setStep('s1','active');
     // 일기 임베딩 + 고정 DB(어서·동양철학·서양과학) 임베딩 간 의미 유사도로 매칭
     const diaryVec = await embedText(diary, 'RETRIEVAL_QUERY');
-    const corpus = await getCorpusEmbeddings();
+    const corpus = await getCorpusEmbeddings(function(done,total){
+      document.getElementById('s1').innerHTML = '<span class="si">🌸</span>일기 분석 중... (DB 준비 '+done+'/'+total+')';
+    });
     const scored = corpus.map(function(c){ return Object.assign({}, c, { s: cosineSim(c.vec, diaryVec) }); });
     const goshoScored = scored.filter(function(c){return c.type==='gosho';}).sort(function(a,b){return b.s-a.s;});
     const easternScored = scored.filter(function(c){return c.type==='eastern';}).sort(function(a,b){return b.s-a.s;});
@@ -645,9 +685,19 @@ async function analyze() {
     };
     setStep('s1','done');
 
-    // 내 Firebase 데이터 (임베딩 기반 의미 매칭)
+    // 내 Firebase 데이터 (임베딩 기반 의미 매칭) — 임베딩이 실패해도 전체 분석은 계속 진행
     setStep('s2','active');
-    const personalItems = await embedPersonalData();
+    const fd = window._fbData || { gosho:[], speeches:[] };
+    let personalItems = [];
+    let personalErr = false;
+    try {
+      personalItems = await embedPersonalData(function(done,total,remainingTotal){
+        document.getElementById('s2').innerHTML = '<span class="si">🔥</span>내 신심일기에서 찾는 중... ('+done+'/'+total+(remainingTotal>total?', 전체 '+remainingTotal+'건 중 일부는 다음에 이어서':'')+')';
+      });
+    } catch(e) {
+      console.error('개인 데이터 임베딩 오류:', e.message);
+      personalErr = true;
+    }
     const myGosho = findMatchEmbed(personalItems.filter(function(x){return x._kind==='gosho';}), diaryVec);
     const mySpeech = findMatchEmbed(personalItems.filter(function(x){return x._kind==='speech';}), diaryVec);
     const fbSec = document.getElementById('firebaseSection');
@@ -659,9 +709,12 @@ async function analyze() {
       if (mySpeech) {
         fbSec.innerHTML += '<div class="card c-firebase"><div class="ctag">💫 스피치</div><div class="fb-content">'+mySpeech.content+'</div><div class="fb-meta"><span class="fb-src">'+(mySpeech.source||'신심일기')+'</span>'+(mySpeech.category?'📂 '+mySpeech.category:'')+'</div></div>';
       }
+    } else if (personalErr) {
+      fbSec.innerHTML = '<div class="card c-firebase" style="opacity:.5;font-size:13px;color:var(--text-soft);padding:14px 18px;">내 어서·스피치 준비 중이에요 (API 요청량이 많아 잠시 대기 중). 조금 있다가 다시 시도하면 더 많이 찾아줘요.</div>';
     } else {
       fbSec.innerHTML = '<div class="card c-firebase" style="opacity:.5;font-size:13px;color:var(--text-soft);padding:14px 18px;">'+(fd.gosho.length||fd.speeches.length?'일기와 관련된 데이터를 찾지 못했어요':'설정 탭에서 로그인하면 내 어서·스피치가 여기 표시돼요')+'</div>';
     }
+    if (fd.gosho.length || fd.speeches.length) _continuePersonalEmbeddingInBackground(); // 남은 항목은 백그라운드에서 이어서 준비
     await sleep(200); setStep('s2','done');
 
     // 어서
