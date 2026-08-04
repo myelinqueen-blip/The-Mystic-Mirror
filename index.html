@@ -50,6 +50,11 @@ label.hicon input{display:none;}
 .rec-del:hover{color:#c0567a;}
 .rec-card-row{display:flex;align-items:center;gap:4px;}
 .rec-card-row .rec-card{flex:1;}
+.card-top-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px;}
+.copy-btn{background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-soft);padding:2px 5px;opacity:.55;flex-shrink:0;}
+.copy-btn:hover{opacity:1;color:var(--pink);}
+.sel-chk{width:18px;height:18px;flex-shrink:0;accent-color:var(--pink);cursor:pointer;}
+#selectBar{position:sticky;bottom:0;background:#fff;border-top:2px solid #ffd6e5;padding:10px 16px;display:none;align-items:center;justify-content:space-between;gap:10px;z-index:50;}
 
 /* 폰트바 */
 .font-bar{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:8px 0 4px;}
@@ -282,8 +287,21 @@ textarea::placeholder{color:#e0aabb;}
 <!-- 모음 탭 -->
 <div class="tab-panel" id="panel-diaries">
 <div class="wrap">
-  <div class="rec-header"><span class="rec-title">📖 일기 모음</span><span class="rec-count" id="diary-count">0개</span></div>
+  <div class="rec-header">
+    <span class="rec-title">📖 일기 모음</span>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="rec-count" id="diary-count">0개</span>
+      <button id="selectModeBtn" onclick="toggleSelectMode()" style="border:2px solid #ffd6e5;background:#fff;color:var(--pink);border-radius:50px;padding:5px 12px;font-size:12px;cursor:pointer;">☑️ 선택</button>
+    </div>
+  </div>
   <div id="diaries-list"></div>
+</div>
+<div id="selectBar">
+  <span id="selectCount" style="font-size:13px;color:var(--text);">0개 선택됨</span>
+  <div style="display:flex;gap:8px;">
+    <button onclick="toggleSelectMode()" style="border:2px solid #ffd6e5;background:#fff;color:var(--text-soft);border-radius:50px;padding:8px 16px;font-size:13px;cursor:pointer;">취소</button>
+    <button onclick="deleteSelected()" style="border:none;background:#e85d75;color:#fff;border-radius:50px;padding:8px 16px;font-size:13px;cursor:pointer;">🗑 삭제</button>
+  </div>
 </div>
 </div>
 
@@ -712,12 +730,14 @@ function rankMatchesEmbed(items, diaryVec, topK, threshold) {
 function renderPersonalCard(icon, label, list) {
   if (!list || !list.length) return '';
   const top = list[0];
-  let html = '<div class="card c-firebase"><div class="ctag">'+icon+' '+label+'</div><div class="fb-content">'+top.content+'</div><div class="fb-meta"><span class="fb-src">'+(top.source||'신심일기')+'</span>'+(top.category?'📂 '+top.category:'')+'</div></div>';
+  const topId = 'cp_'+(_copyIdSeq++);
+  let html = '<div class="card c-firebase"><div class="card-top-row"><div class="ctag">'+icon+' '+label+'</div>'+mkCopyBtn(topId)+'</div><div class="fb-content" id="'+topId+'">'+top.content+'</div><div class="fb-meta"><span class="fb-src">'+(top.source||'신심일기')+'</span>'+(top.category?'📂 '+top.category:'')+'</div></div>';
   if (list.length > 1) {
     const restId = 'more_'+label.replace(/\s/g,'')+'_'+Math.random().toString(36).slice(2,8);
     html += '<div style="text-align:center;margin:-4px 0 10px;"><button type="button" onclick="toggleMore(\''+restId+'\', this, '+(list.length-1)+')" style="border:none;background:none;color:var(--lav);font-size:12px;cursor:pointer;">▼ '+(list.length-1)+'개 더 보기</button></div>';
     html += '<div id="'+restId+'" style="display:none;">' + list.slice(1).map(function(m){
-      return '<div class="card c-firebase" style="opacity:.85;"><div class="ctag">'+icon+' '+label+'</div><div class="fb-content">'+m.content+'</div><div class="fb-meta"><span class="fb-src">'+(m.source||'신심일기')+'</span>'+(m.category?'📂 '+m.category:'')+'</div></div>';
+      const mid = 'cp_'+(_copyIdSeq++);
+      return '<div class="card c-firebase" style="opacity:.85;"><div class="card-top-row"><div class="ctag">'+icon+' '+label+'</div>'+mkCopyBtn(mid)+'</div><div class="fb-content" id="'+mid+'">'+m.content+'</div><div class="fb-meta"><span class="fb-src">'+(m.source||'신심일기')+'</span>'+(m.category?'📂 '+m.category:'')+'</div></div>';
     }).join('') + '</div>';
   }
   return html;
@@ -821,7 +841,26 @@ function showToast(msg) {
   window._toastTimer = setTimeout(function(){ t.style.opacity='0'; }, 2400);
 }
 
-// ── 클라우드 저장 / 백업 다운로드 / 복원 ──
+// 클립보드로 내용 복사
+function copyText(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const text = el.innerText || el.textContent || '';
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function(){ showToast('📋 복사했어요'); }).catch(function(){ showToast('❌ 복사 실패'); });
+  } else {
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); showToast('📋 복사했어요'); } catch(e) { showToast('❌ 복사 실패'); }
+    document.body.removeChild(ta);
+  }
+}
+let _copyIdSeq = 0;
+// contentId를 참조하는 작은 복사 버튼 HTML 생성 (내용은 실제 렌더된 요소의 텍스트를 그대로 복사하므로 따옴표 등 이스케이프 걱정 없음)
+function mkCopyBtn(contentId) {
+  return '<button type="button" class="copy-btn" onclick="copyText(\''+contentId+'\')" title="복사">📋</button>';
+}
+
 async function cloudSaveRecords() {
   if (!window._fbUid) { showToast('먼저 로그인해줘요 🔑'); return; }
   try {
@@ -980,7 +1019,8 @@ async function analyze() {
     (p.eastern_ids||[]).forEach(function(eid) {
       const e = EASTERN[eid];
       if (!e) return;
-      eastSec.innerHTML += '<div class="card c-east"><div class="ctag">🌿 '+e.origin+'</div><div style="font-size:15px;color:#2d4a2d;font-weight:700;margin-bottom:4px;">'+e.title+'</div><div class="east-cn">'+e.cn+'</div><div class="east-meaning">→ '+e.meaning+'</div><div class="east-desc">'+e.desc+'</div><div class="east-origin" style="margin-top:6px;"><a href="'+e.url+'" target="_blank" rel="noopener" class="ref-link">원문 보기 ↗</a></div></div>';
+      const cid = 'cp_'+(_copyIdSeq++);
+      eastSec.innerHTML += '<div class="card c-east"><div class="card-top-row"><div class="ctag">🌿 '+e.origin+'</div>'+mkCopyBtn(cid)+'</div><div id="'+cid+'"><div style="font-size:15px;color:#2d4a2d;font-weight:700;margin-bottom:4px;">'+e.title+'</div><div class="east-cn">'+e.cn+'</div><div class="east-meaning">→ '+e.meaning+'</div><div class="east-desc">'+e.desc+'</div></div><div class="east-origin" style="margin-top:6px;"><a href="'+e.url+'" target="_blank" rel="noopener" class="ref-link">원문 보기 ↗</a></div></div>';
     });
     if (!p.eastern_ids.length) eastSec.innerHTML = '<div class="card" style="opacity:.5;font-size:13px;color:var(--text-soft);padding:14px 18px;">오늘 일기와 뚜렷이 연결되는 동양철학 항목을 찾지 못했어요</div>';
     await sleep(200); setStep('s3','done');
@@ -992,7 +1032,8 @@ async function analyze() {
     (p.western_ids||[]).forEach(function(wid) {
       const w = WESTERN[wid];
       if (!w) return;
-      westSec.innerHTML += '<div class="card c-west"><div class="ctag">🔭 '+w.field+'</div><div style="font-size:15px;color:#1f5470;font-weight:700;margin-bottom:6px;">'+w.title+'</div><div class="west-summary">'+w.summary+'</div><div style="margin-top:8px;"><a href="'+w.url+'" target="_blank" rel="noopener" class="ref-link">자세히 보기 (Britannica) ↗</a></div></div>';
+      const cid = 'cp_'+(_copyIdSeq++);
+      westSec.innerHTML += '<div class="card c-west"><div class="card-top-row"><div class="ctag">🔭 '+w.field+'</div>'+mkCopyBtn(cid)+'</div><div id="'+cid+'"><div style="font-size:15px;color:#1f5470;font-weight:700;margin-bottom:6px;">'+w.title+'</div><div class="west-summary">'+w.summary+'</div></div><div style="margin-top:8px;"><a href="'+w.url+'" target="_blank" rel="noopener" class="ref-link">자세히 보기 (Britannica) ↗</a></div></div>';
     });
     if (!p.western_ids.length) westSec.innerHTML = '<div class="card" style="opacity:.5;font-size:13px;color:var(--text-soft);padding:14px 18px;">오늘 일기와 뚜렷이 연결되는 서양철학·과학 항목을 찾지 못했어요</div>';
     await sleep(200); setStep('s4','done');
@@ -1021,15 +1062,55 @@ function fmtTime(iso) { const d=new Date(iso); return d.getHours().toString().pa
 function fmtKey(iso) { const d=new Date(iso); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
 function groupByDate(recs) { const g={}; recs.forEach(function(r){ const k=fmtKey(r.date); if(!g[k])g[k]=[]; g[k].push(r); }); return g; }
 
+let _selectMode = false;
+let _selectedIds = new Set();
+
 function renderDiaries() {
   const recs=getRecords(); document.getElementById('diary-count').textContent=recs.length+'개';
   const el=document.getElementById('diaries-list');
   if(!recs.length){ el.innerHTML='<div class="empty-state"><span class="ei">📖</span>아직 기록이 없어요<br>오늘의 마음을 적어봐요 🌸</div>'; return; }
   el.innerHTML=Object.entries(groupByDate(recs)).map(function(e){
     return '<div class="date-group"><div class="date-label">🌸 '+fmtDate(e[1][0].date)+'</div>'+e[1].map(function(r){
-      return '<div class="rec-card-row"><div class="rec-card" onclick="openModal('+r.id+')"><div class="rec-time">'+fmtTime(r.date)+'</div><div class="rec-txt">'+(r.diary.length>80?r.diary.slice(0,80)+'…':r.diary)+'</div><div class="rec-preview">→ 관련 자료 보기</div></div><button class="rec-del" onclick="event.stopPropagation();deleteRecord('+r.id+')" title="삭제">🗑</button></div>';
+      const chk = _selectMode ? '<input type="checkbox" class="sel-chk" '+(_selectedIds.has(r.id)?'checked':'')+' onclick="event.stopPropagation();toggleSelectRecord('+r.id+',this.checked)">' : '';
+      const cardClick = _selectMode ? "toggleSelectRecordFromCard("+r.id+")" : "openModal("+r.id+")";
+      const delBtn = _selectMode ? '' : '<button class="rec-del" onclick="event.stopPropagation();deleteRecord('+r.id+')" title="삭제">🗑</button>';
+      return '<div class="rec-card-row">'+chk+'<div class="rec-card" onclick="'+cardClick+'"><div class="rec-time">'+fmtTime(r.date)+'</div><div class="rec-txt">'+(r.diary.length>80?r.diary.slice(0,80)+'…':r.diary)+'</div><div class="rec-preview">→ 관련 자료 보기</div></div>'+delBtn+'</div>';
     }).join('')+'</div>';
   }).join('');
+  updateSelectBar();
+}
+
+function toggleSelectMode() {
+  _selectMode = !_selectMode;
+  _selectedIds.clear();
+  document.getElementById('selectModeBtn').textContent = _selectMode ? '✕ 선택 취소' : '☑️ 선택';
+  renderDiaries();
+}
+function toggleSelectRecord(id, checked) {
+  if (checked) _selectedIds.add(id); else _selectedIds.delete(id);
+  updateSelectBar();
+}
+function toggleSelectRecordFromCard(id) {
+  const checked = !_selectedIds.has(id);
+  toggleSelectRecord(id, checked);
+  renderDiaries();
+}
+function updateSelectBar() {
+  const bar = document.getElementById('selectBar');
+  if (!bar) return;
+  bar.style.display = _selectMode ? 'flex' : 'none';
+  document.getElementById('selectCount').textContent = _selectedIds.size+'개 선택됨';
+}
+function deleteSelected() {
+  if (!_selectedIds.size) { showToast('선택된 일기가 없어요'); return; }
+  if (!confirm(_selectedIds.size+'개 일기를 삭제할까요? 되돌릴 수 없어요.')) return;
+  const recs = getRecords().filter(function(r){ return !_selectedIds.has(r.id); });
+  localStorage.setItem('bf_records', JSON.stringify(recs));
+  showToast('🗑 '+_selectedIds.size+'개 삭제했어요');
+  _selectedIds.clear();
+  _selectMode = false;
+  document.getElementById('selectModeBtn').textContent = '☑️ 선택';
+  renderDiaries();
 }
 
 function deleteRecord(id) {
