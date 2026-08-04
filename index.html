@@ -373,14 +373,7 @@ onAuthStateChanged(auth, async function(user) {
               }
             });
           }
-          if (essayData && essayData.core && String(essayData.core).length > 5) {
-            window._fbData.gosho.push({
-              content: String(essayData.core),
-              category: essayName,
-              source: essayName,
-              tags: []
-            });
-          }
+          // 참고: essayData.core("어서 핵심")는 폴더당 자유메모 1칸이라 실제 어서 인용이 아닌 다른 메모가 들어있을 수 있어 후보에서 제외함
         });
       }
 
@@ -388,9 +381,12 @@ onAuthStateChanged(auth, async function(user) {
       const recordsSnap = await get(ref(db, 'users/' + user.uid + '/records'));
       if (recordsSnap.exists()) {
         const records = recordsSnap.val();
+        const dateKeys = Object.keys(records);
+        let datesWithoutSpeech = 0, datesWithSpeech = 0;
         Object.entries(records).forEach(function(dateEntry) {
           const dateData = dateEntry[1];
           if (dateData && dateData.speech) {
+            datesWithSpeech++;
             Object.values(dateData.speech).forEach(function(item) {
               const txt = item && (item.text || item.content || item.memo || '');
               if (txt && txt.length > 5) {
@@ -402,8 +398,11 @@ onAuthStateChanged(auth, async function(user) {
                 });
               }
             });
+          } else {
+            datesWithoutSpeech++;
           }
         });
+        console.log('records 진단 — 날짜 키 총', dateKeys.length, '개 / speech 있는 날짜', datesWithSpeech, '개 / speech 없는 날짜', datesWithoutSpeech, '개');
         console.log('스피치 로드 완료:', window._fbData.speeches.length);
       }
       // 같은 내용이 어서(essayNotes)와 스피치 양쪽에 다 있으면 스피치 쪽만 남김 (어서 카드에 스피치 내용이 잘못 뜨는 문제 방지)
