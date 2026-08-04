@@ -219,20 +219,11 @@ textarea::placeholder{color:#e0aabb;}
       <div class="card c-firebase" style="opacity:.5;font-size:13px;color:var(--text-soft);padding:14px 18px;">설정 탭에서 로그인하면 내 어서·스피치가 여기 표시돼요</div>
     </div>
 
-    <!-- ② SGI 어서 -->
-    <div class="section-head sh-sgi" style="margin-top:6px;"><span class="section-head-txt">📜 니치렌 대성인 어서</span></div>
-    <div class="card c-gosho">
-      <div class="ctag">📜 어서 (御書)</div>
-      <div class="gosho-en" id="goshoEn"></div>
-      <div class="gosho-kr" id="goshoKr"></div>
-      <div class="src-link" id="goshoSrc"></div>
-    </div>
-
-    <!-- ③ 동양철학 -->
+    <!-- ② 동양철학 -->
     <div class="section-head sh-east"><span class="section-head-txt">🌿 동양철학 — 논어 · 맹자 · 도덕경</span></div>
     <div id="eastSection"></div>
 
-    <!-- ④ 서양·과학 -->
+    <!-- ③ 서양·과학 -->
     <div class="section-head sh-west"><span class="section-head-txt">🔭 서양철학 · 과학 — 양자역학 · 심리학 외</span></div>
     <div id="westSection"></div>
 
@@ -415,6 +406,9 @@ onAuthStateChanged(auth, async function(user) {
         });
         console.log('스피치 로드 완료:', window._fbData.speeches.length);
       }
+      // 같은 내용이 어서(essayNotes)와 스피치 양쪽에 다 있으면 스피치 쪽만 남김 (어서 카드에 스피치 내용이 잘못 뜨는 문제 방지)
+      const _speechContentSet = new Set(window._fbData.speeches.map(function(s){ return String(s.content).trim(); }));
+      window._fbData.gosho = window._fbData.gosho.filter(function(g){ return !_speechContentSet.has(String(g.content).trim()); });
       console.log('Firebase 로드 완료 — 어서:', window._fbData.gosho.length, '스피치:', window._fbData.speeches.length);
       if (window._fbData.gosho.length > 0) console.log('어서 샘플:', window._fbData.gosho[0].content.slice(0,50));
       if (window._fbData.speeches.length > 0) console.log('스피치 샘플:', window._fbData.speeches[0].content.slice(0,50));
@@ -440,13 +434,14 @@ const WESTERN = {"w1": {"id": "w1", "title": "양자 중첩 (Quantum Superpositi
 
 // ── Gemini 임베딩 (의미 기반 매칭) ──
 const EMBED_MODEL = 'gemini-embedding-001';
-const EMBED_DIM = 768;
-const CORPUS_VERSION = 'v2'; // DB 확장(동양철학·서양과학 항목 대폭 추가) — 버전 올려서 캐시 재계산
+const EMBED_DIM = 256; // 768 → 256로 축소 (품질 손실은 미미하고 저장 용량은 1/3): localStorage 5MB 한도 초과 방지
+const CORPUS_VERSION = 'v4'; // 임베딩 차원 축소(768→256) — 캐시 재계산
 
 function normalizeVec(v) {
   let norm = Math.sqrt(v.reduce(function(s,x){return s+x*x;},0));
   if (!norm) return v;
-  return v.map(function(x){return x/norm;});
+  // 소수 5자리로 반올림해서 저장 용량을 크게 줄임 (유사도 계산 정확도엔 거의 영향 없음)
+  return v.map(function(x){return Math.round((x/norm)*100000)/100000;});
 }
 function cosineSim(a,b) {
   let dot=0; for (let i=0;i<a.length;i++) dot += a[i]*(b[i]||0);
@@ -455,6 +450,41 @@ function cosineSim(a,b) {
 function simpleHash(str) {
   let h=0; for (let i=0;i<str.length;i++) { h=(Math.imul(31,h)+str.charCodeAt(i))|0; }
   return h.toString(36);
+}
+
+// ── IndexedDB 저장소 (개인 임베딩 캐시용 — localStorage 5MB 한도보다 훨씬 여유 있음) ──
+let _idbPromise = null;
+function _openIDB() {
+  if (_idbPromise) return _idbPromise;
+  _idbPromise = new Promise(function(resolve, reject) {
+    if (!window.indexedDB) { reject(new Error('IndexedDB 미지원')); return; }
+    const req = indexedDB.open('bf_embed_store', 1);
+    req.onupgradeneeded = function() { req.result.createObjectStore('kv'); };
+    req.onsuccess = function() { resolve(req.result); };
+    req.onerror = function() { reject(req.error); };
+  });
+  return _idbPromise;
+}
+async function idbGet(key) {
+  try {
+    const db = await _openIDB();
+    return await new Promise(function(resolve, reject) {
+      const req = db.transaction('kv','readonly').objectStore('kv').get(key);
+      req.onsuccess = function(){ resolve(req.result); };
+      req.onerror = function(){ reject(req.error); };
+    });
+  } catch(e) { console.error('IndexedDB 읽기 오류:', e.message); return undefined; }
+}
+async function idbSet(key, value) {
+  try {
+    const db = await _openIDB();
+    await new Promise(function(resolve, reject) {
+      const tx = db.transaction('kv','readwrite');
+      tx.objectStore('kv').put(value, key);
+      tx.oncomplete = function(){ resolve(); };
+      tx.onerror = function(){ reject(tx.error); };
+    });
+  } catch(e) { console.error('IndexedDB 저장 오류:', e.message); }
 }
 
 // ── 전역 속도 제한 (무료 티어 쿼터 보호: embed_content 분당 100건 한도보다 여유 있게) ──
@@ -505,34 +535,46 @@ async function embedBatch(texts, taskType, onProgress) {
   return out;
 }
 
-// 고정 DB(어서·동양철학·서양과학) 임베딩 — 최초 1회만 계산 후 localStorage 캐시
+// 고정 DB(동양철학·서양과학) 임베딩 — 최초 1회만 계산 후 localStorage 캐시 (항목이 적어 용량 문제 없음)
 async function getCorpusEmbeddings(onProgress) {
   const cacheKey = 'bf_corpus_embed_' + CORPUS_VERSION;
   const cached = localStorage.getItem(cacheKey);
   if (cached) { try { const parsed = JSON.parse(cached); if (parsed && parsed.length) return parsed; } catch(e){} }
   const items = [];
-  GOSHO.forEach(function(g,i){ items.push({ type:'gosho', id:i, text: g.kr+' '+g.en+' '+g.source }); });
   Object.values(EASTERN).forEach(function(e){ items.push({ type:'eastern', id:e.id, text: e.title+' '+e.meaning+' '+e.desc }); });
   Object.values(WESTERN).forEach(function(w){ items.push({ type:'western', id:w.id, text: w.title+' '+w.summary }); });
   const vectors = await embedBatch(items.map(function(x){return x.text;}), 'RETRIEVAL_DOCUMENT', onProgress);
   const result = items.map(function(it,i){ return { type:it.type, id:it.id, vec:vectors[i] }; });
-  localStorage.setItem(cacheKey, JSON.stringify(result));
+  try { localStorage.setItem(cacheKey, JSON.stringify(result)); } catch(e) { console.error('고정 DB 캐시 저장 오류:', e.message); }
   return result;
 }
 
 // 한 번 호출당 새로 임베딩할 최대 개수 (분석 화면이 너무 오래 멈추지 않도록 제한, 나머지는 다음 호출/백그라운드에서 이어서 처리)
 const MAX_PERSONAL_EMBED_PER_CALL = 60;
+const PERSONAL_CACHE_VERSION = 'v2'; // 임베딩 차원 축소로 캐시 형식 변경 — 새 버전 키 사용
 
-// 내 신심일기 어서·스피치 임베딩 — uid별 캐시, 새 항목만 추가 계산 (중단돼도 이미 처리한 만큼은 즉시 저장)
+async function _loadPersonalCache(uid) {
+  const idbKey = 'bf_personal_embed_'+PERSONAL_CACHE_VERSION+'_'+uid;
+  let cache = await idbGet(idbKey);
+  if (cache) return cache;
+  // 예전 localStorage 캐시가 남아있으면 1회 마이그레이션 시도 (없거나 차원이 달라 못 쓰면 그냥 새로 시작)
+  try {
+    const legacyRaw = localStorage.getItem('bf_personal_embed_'+uid);
+    localStorage.removeItem('bf_personal_embed_'+uid); // 용량 확보를 위해 옛 캐시는 지움 (차원이 달라 재사용 불가)
+    void legacyRaw;
+  } catch(e) {}
+  return {};
+}
+
+// 내 신심일기 어서·스피치 임베딩 — uid별 캐시(IndexedDB), 새 항목만 추가 계산 (중단돼도 이미 처리한 만큼은 즉시 저장)
 async function embedPersonalData(onProgress) {
   const fd = window._fbData || { gosho:[], speeches:[] };
   const all = fd.gosho.map(function(x){ return Object.assign({_kind:'gosho'}, x); })
     .concat(fd.speeches.map(function(x){ return Object.assign({_kind:'speech'}, x); }));
   if (!all.length) return [];
   const uid = window._fbUid || 'anon';
-  const cacheKey = 'bf_personal_embed_' + uid;
-  let cache = {};
-  try { cache = JSON.parse(localStorage.getItem(cacheKey) || '{}'); } catch(e){}
+  const idbKey = 'bf_personal_embed_'+PERSONAL_CACHE_VERSION+'_'+uid;
+  let cache = await _loadPersonalCache(uid);
   const hashes = all.map(function(it){ return simpleHash(it.content); });
   const toEmbedIdx = [];
   all.forEach(function(it,i){ if (!cache[hashes[i]]) toEmbedIdx.push(i); });
@@ -547,9 +589,9 @@ async function embedPersonalData(onProgress) {
     }
     done++;
     if (onProgress) onProgress(done, runIdx.length, toEmbedIdx.length);
-    if (done % 8 === 0) localStorage.setItem(cacheKey, JSON.stringify(cache)); // 중간중간 저장 (끊겨도 유실 최소화)
+    if (done % 8 === 0) await idbSet(idbKey, cache); // 중간중간 저장 (끊겨도 유실 최소화)
   }
-  localStorage.setItem(cacheKey, JSON.stringify(cache));
+  await idbSet(idbKey, cache);
   return all.map(function(it,i){ return Object.assign({}, it, { vec: cache[hashes[i]] }); });
 }
 
@@ -564,8 +606,7 @@ async function _continuePersonalEmbeddingInBackground() {
       const total = fd.gosho.length + fd.speeches.length;
       if (!total) break;
       const uid = window._fbUid || 'anon';
-      let cache = {};
-      try { cache = JSON.parse(localStorage.getItem('bf_personal_embed_'+uid) || '{}'); } catch(e){}
+      const cache = await _loadPersonalCache(uid);
       const all = fd.gosho.concat(fd.speeches);
       const remaining = all.filter(function(it){ return !cache[simpleHash(it.content)]; }).length;
       if (!remaining) break;
@@ -586,6 +627,7 @@ function findMatchEmbed(items, diaryVec) {
   });
   return (best && bestScore > 0.35) ? best : null;
 }
+
 
 
 const _GH = {
@@ -675,11 +717,10 @@ async function analyze() {
       document.getElementById('s1').innerHTML = '<span class="si">🌸</span>일기 분석 중... (DB 준비 '+done+'/'+total+')';
     });
     const scored = corpus.map(function(c){ return Object.assign({}, c, { s: cosineSim(c.vec, diaryVec) }); });
-    const goshoScored = scored.filter(function(c){return c.type==='gosho';}).sort(function(a,b){return b.s-a.s;});
-    const easternScored = scored.filter(function(c){return c.type==='eastern';}).sort(function(a,b){return b.s-a.s;});
-    const westernScored = scored.filter(function(c){return c.type==='western';}).sort(function(a,b){return b.s-a.s;});
+    const MATCH_THRESHOLD = 0.4; // 이 기준 미만이면 억지로 끼워맞추지 않고 그냥 안 보여줌
+    const easternScored = scored.filter(function(c){return c.type==='eastern' && c.s>=MATCH_THRESHOLD;}).sort(function(a,b){return b.s-a.s;});
+    const westernScored = scored.filter(function(c){return c.type==='western' && c.s>=MATCH_THRESHOLD;}).sort(function(a,b){return b.s-a.s;});
     const p = {
-      gosho_id: goshoScored.length ? goshoScored[0].id : 0,
       eastern_ids: easternScored.slice(0,3).map(function(c){return c.id;}),
       western_ids: westernScored.slice(0,3).map(function(c){return c.id;})
     };
@@ -717,35 +758,31 @@ async function analyze() {
     if (fd.gosho.length || fd.speeches.length) _continuePersonalEmbeddingInBackground(); // 남은 항목은 백그라운드에서 이어서 준비
     await sleep(200); setStep('s2','done');
 
-    // 어서
-    const g = GOSHO[Number(p.gosho_id)] || GOSHO[0];
-    document.getElementById('goshoEn').textContent = '"'+g.en+'"';
-    document.getElementById('goshoKr').textContent = '"'+g.kr+'"';
-    document.getElementById('goshoSrc').innerHTML = '<a href="'+g.url+'" target="_blank" rel="noopener" class="src-link" style="color:var(--lav);border-bottom:1px dotted var(--lav);text-decoration:none;font-size:11px;">'+g.source+' ↗</a>';
-
-    // 동양철학
+    // 동양철학 (관련 있는 항목이 없으면 억지로 채우지 않음)
     setStep('s3','active');
     const eastSec = document.getElementById('eastSection');
     eastSec.innerHTML = '';
-    (p.eastern_ids||['e2']).forEach(function(eid) {
+    (p.eastern_ids||[]).forEach(function(eid) {
       const e = EASTERN[eid];
       if (!e) return;
       eastSec.innerHTML += '<div class="card c-east"><div class="ctag">🌿 '+e.origin+'</div><div style="font-size:15px;color:#2d4a2d;font-weight:700;margin-bottom:4px;">'+e.title+'</div><div class="east-cn">'+e.cn+'</div><div class="east-meaning">→ '+e.meaning+'</div><div class="east-desc">'+e.desc+'</div><div class="east-origin" style="margin-top:6px;"><a href="'+e.url+'" target="_blank" rel="noopener" class="ref-link">원문 보기 ↗</a></div></div>';
     });
+    if (!p.eastern_ids.length) eastSec.innerHTML = '<div class="card" style="opacity:.5;font-size:13px;color:var(--text-soft);padding:14px 18px;">오늘 일기와 뚜렷이 연결되는 동양철학 항목을 찾지 못했어요</div>';
     await sleep(200); setStep('s3','done');
 
-    // 서양·과학
+    // 서양·과학 (관련 있는 항목이 없으면 억지로 채우지 않음)
     setStep('s4','active');
     const westSec = document.getElementById('westSection');
     westSec.innerHTML = '';
-    (p.western_ids||['w1']).forEach(function(wid) {
+    (p.western_ids||[]).forEach(function(wid) {
       const w = WESTERN[wid];
       if (!w) return;
       westSec.innerHTML += '<div class="card c-west"><div class="ctag">🔭 '+w.field+'</div><div style="font-size:15px;color:#1f5470;font-weight:700;margin-bottom:6px;">'+w.title+'</div><div class="west-summary">'+w.summary+'</div><div style="margin-top:8px;"><a href="'+w.url+'" target="_blank" rel="noopener" class="ref-link">자세히 보기 (Britannica) ↗</a></div></div>';
     });
+    if (!p.western_ids.length) westSec.innerHTML = '<div class="card" style="opacity:.5;font-size:13px;color:var(--text-soft);padding:14px 18px;">오늘 일기와 뚜렷이 연결되는 서양철학·과학 항목을 찾지 못했어요</div>';
     await sleep(200); setStep('s4','done');
 
-    saveRecord(diary, {gosho_id:p.gosho_id, eastern_ids:p.eastern_ids, western_ids:p.western_ids, myGosho:myGosho, mySpeech:mySpeech});
+    saveRecord(diary, {eastern_ids:p.eastern_ids, western_ids:p.western_ids, myGosho:myGosho, mySpeech:mySpeech});
     document.getElementById('loading').classList.remove('on');
     document.getElementById('results').classList.add('on');
     document.getElementById('results').scrollIntoView({behavior:'smooth',block:'start'});
@@ -786,24 +823,21 @@ function renderAll() {
   if(!recs.length){ el.innerHTML='<div class="empty-state"><span class="ei">📚</span>아직 기록이 없어요 🌸</div>'; return; }
   el.innerHTML=Object.entries(groupByDate(recs)).map(function(e){
     return '<div class="date-group"><div class="date-label">🌸 '+fmtDate(e[1][0].date)+'</div>'+e[1].map(function(r){
-      const g=GOSHO[Number(r.gosho_id)]||GOSHO[0];
       const eHtml=(r.eastern_ids||[]).map(function(eid){const item=EASTERN[eid];return item?'<div style="margin-bottom:6px;"><b>'+item.title+'</b> — '+item.meaning+'</div>':''; }).join('');
       const wHtml=(r.western_ids||[]).map(function(wid){const item=WESTERN[wid];return item?'<div style="margin-bottom:6px;"><b>'+item.title+'</b> — '+item.summary.slice(0,60)+'…</div>':''; }).join('');
-      return '<div class="card" style="background:white;border:2px solid #ffe4ee;margin-bottom:10px;"><div style="font-size:11px;color:var(--text-soft);margin-bottom:8px;">'+fmtTime(r.date)+'</div><div style="font-size:14px;line-height:1.8;color:var(--text);margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed #ffd6e5;">'+r.diary+'</div>'+(r.myGosho?'<div style="font-size:13px;color:#4a3670;background:var(--lav-light);padding:10px;border-radius:10px;margin-bottom:8px;"><b>🔥 내 어서</b><br>'+r.myGosho.content+'</div>':'')+'<div style="font-size:13px;color:#4a3670;background:var(--lav-light);padding:10px;border-radius:10px;margin-bottom:8px;"><b>📜 어서</b><br>'+g.kr+'</div>'+(eHtml?'<div style="font-size:13px;color:#2d5a2d;background:var(--sage-light);padding:10px;border-radius:10px;margin-bottom:8px;"><b>🌿 동양철학</b><br>'+eHtml+'</div>':'')+(wHtml?'<div style="font-size:13px;color:#1f5470;background:var(--sky-light);padding:10px;border-radius:10px;"><b>🔭 서양·과학</b><br>'+wHtml+'</div>':'')+'</div>';
+      return '<div class="card" style="background:white;border:2px solid #ffe4ee;margin-bottom:10px;"><div style="font-size:11px;color:var(--text-soft);margin-bottom:8px;">'+fmtTime(r.date)+'</div><div style="font-size:14px;line-height:1.8;color:var(--text);margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed #ffd6e5;">'+r.diary+'</div>'+(r.myGosho?'<div style="font-size:13px;color:#4a3670;background:var(--lav-light);padding:10px;border-radius:10px;margin-bottom:8px;"><b>🔥 내 어서</b><br>'+r.myGosho.content+'</div>':'')+(eHtml?'<div style="font-size:13px;color:#2d5a2d;background:var(--sage-light);padding:10px;border-radius:10px;margin-bottom:8px;"><b>🌿 동양철학</b><br>'+eHtml+'</div>':'')+(wHtml?'<div style="font-size:13px;color:#1f5470;background:var(--sky-light);padding:10px;border-radius:10px;"><b>🔭 서양·과학</b><br>'+wHtml+'</div>':'')+'</div>';
     }).join('')+'</div>';
   }).join('');
 }
 
 function openModal(id) {
   const r=getRecords().find(function(x){return x.id===id;}); if(!r) return;
-  const g=GOSHO[Number(r.gosho_id)]||GOSHO[0];
   document.getElementById('modal-date').textContent=fmtDate(r.date)+' '+fmtTime(r.date);
   document.getElementById('modal-diary').textContent=r.diary;
   const eHtml=(r.eastern_ids||[]).map(function(eid){const item=EASTERN[eid];return item?'<div style="margin-bottom:8px;padding:10px;background:var(--sage-light);border-radius:10px;"><div style="font-size:12px;font-weight:700;color:#2d5a2d;">🌿 '+item.title+'</div><div style="font-size:12px;color:#3d6a3d;margin-top:4px;">'+item.cn+'</div><div style="font-size:12px;color:#2d5a2d;font-weight:700;margin-top:2px;">→ '+item.meaning+'</div></div>':''; }).join('');
   const wHtml=(r.western_ids||[]).map(function(wid){const item=WESTERN[wid];return item?'<div style="margin-bottom:8px;padding:10px;background:var(--sky-light);border-radius:10px;"><div style="font-size:12px;font-weight:700;color:#1f5470;">🔭 '+item.title+'</div><div style="font-size:12px;color:#1f5470;margin-top:4px;">'+item.summary+'</div></div>':''; }).join('');
   document.getElementById('modal-content').innerHTML=
     (r.myGosho?'<div style="margin-bottom:8px;padding:10px;background:linear-gradient(135deg,#fff0f4,#f8f0ff);border-radius:10px;border:1.5px solid #e8c8f0;"><div style="font-size:11px;color:var(--lav);font-weight:700;">🔥 내 신심일기 어서</div><div style="font-size:13px;line-height:1.9;color:var(--text);margin-top:4px;">'+r.myGosho.content+'</div></div>':'')+
-    '<div style="margin-bottom:8px;padding:10px;background:var(--lav-light);border-radius:10px;"><div style="font-size:11px;color:var(--lav);font-weight:700;">📜 어서 — '+g.source+'</div><div style="font-size:13px;line-height:1.9;color:#4a3670;margin-top:4px;">'+g.kr+'</div></div>'+
     eHtml+wHtml;
   document.getElementById('modal').classList.add('on');
 }
