@@ -617,15 +617,35 @@ async function _continuePersonalEmbeddingInBackground() {
   window._embedBackgroundRunning = false;
 }
 
-function findMatchEmbed(items, diaryVec) {
-  if (!items || !items.length || !diaryVec) return null;
-  let best=null, bestScore=-1;
-  items.forEach(function(it) {
-    if (!it.vec) return;
-    const s = cosineSim(it.vec, diaryVec);
-    if (s > bestScore) { bestScore = s; best = it; }
-  });
-  return (best && bestScore > 0.35) ? best : null;
+function rankMatchesEmbed(items, diaryVec, topK, threshold) {
+  if (!items || !items.length || !diaryVec) return [];
+  return items.filter(function(it){ return it.vec; })
+    .map(function(it){ return { it: it, s: cosineSim(it.vec, diaryVec) }; })
+    .filter(function(x){ return x.s >= (threshold==null?0.4:threshold); })
+    .sort(function(a,b){ return b.s-a.s; })
+    .slice(0, topK||5)
+    .map(function(x){ return x.it; });
+}
+
+// 가장 연관성 높은 카드 1개 + "더 보기"로 펼쳐볼 수 있는 나머지 후보들
+function renderPersonalCard(icon, label, list) {
+  if (!list || !list.length) return '';
+  const top = list[0];
+  let html = '<div class="card c-firebase"><div class="ctag">'+icon+' '+label+'</div><div class="fb-content">'+top.content+'</div><div class="fb-meta"><span class="fb-src">'+(top.source||'신심일기')+'</span>'+(top.category?'📂 '+top.category:'')+'</div></div>';
+  if (list.length > 1) {
+    const restId = 'more_'+label.replace(/\s/g,'')+'_'+Math.random().toString(36).slice(2,8);
+    html += '<div style="text-align:center;margin:-4px 0 10px;"><button type="button" onclick="toggleMore(\''+restId+'\', this, '+(list.length-1)+')" style="border:none;background:none;color:var(--lav);font-size:12px;cursor:pointer;">▼ '+(list.length-1)+'개 더 보기</button></div>';
+    html += '<div id="'+restId+'" style="display:none;">' + list.slice(1).map(function(m){
+      return '<div class="card c-firebase" style="opacity:.85;"><div class="ctag">'+icon+' '+label+'</div><div class="fb-content">'+m.content+'</div><div class="fb-meta"><span class="fb-src">'+(m.source||'신심일기')+'</span>'+(m.category?'📂 '+m.category:'')+'</div></div>';
+    }).join('') + '</div>';
+  }
+  return html;
+}
+function toggleMore(id, btn, count) {
+  const el = document.getElementById(id);
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  btn.textContent = open ? ('▼ '+count+'개 더 보기') : '▲ 접기';
 }
 
 
@@ -739,21 +759,19 @@ async function analyze() {
       console.error('개인 데이터 임베딩 오류:', e.message);
       personalErr = true;
     }
-    const myGosho = findMatchEmbed(personalItems.filter(function(x){return x._kind==='gosho';}), diaryVec);
-    const mySpeech = findMatchEmbed(personalItems.filter(function(x){return x._kind==='speech';}), diaryVec);
+    const myGoshoList = rankMatchesEmbed(personalItems.filter(function(x){return x._kind==='gosho';}), diaryVec, 5);
+    const mySpeechList = rankMatchesEmbed(personalItems.filter(function(x){return x._kind==='speech';}), diaryVec, 5);
+    const myGosho = myGoshoList[0] || null; // 기록 저장용 (히스토리에는 1위만 남김)
+    const mySpeech = mySpeechList[0] || null;
     const fbSec = document.getElementById('firebaseSection');
-    fbSec.innerHTML = '';
-    if (myGosho || mySpeech) {
-      if (myGosho) {
-        fbSec.innerHTML += '<div class="card c-firebase"><div class="ctag">🔥 어서</div><div class="fb-content">'+myGosho.content+'</div><div class="fb-meta"><span class="fb-src">'+(myGosho.source||'신심일기')+'</span>'+(myGosho.category?'📂 '+myGosho.category:'')+'</div></div>';
-      }
-      if (mySpeech) {
-        fbSec.innerHTML += '<div class="card c-firebase"><div class="ctag">💫 스피치</div><div class="fb-content">'+mySpeech.content+'</div><div class="fb-meta"><span class="fb-src">'+(mySpeech.source||'신심일기')+'</span>'+(mySpeech.category?'📂 '+mySpeech.category:'')+'</div></div>';
-      }
+    const goshoCardHtml = renderPersonalCard('🔥','어서', myGoshoList);
+    const speechCardHtml = renderPersonalCard('💫','스피치', mySpeechList);
+    if (goshoCardHtml || speechCardHtml) {
+      fbSec.innerHTML = goshoCardHtml + speechCardHtml;
     } else if (personalErr) {
       fbSec.innerHTML = '<div class="card c-firebase" style="opacity:.5;font-size:13px;color:var(--text-soft);padding:14px 18px;">내 어서·스피치 준비 중이에요 (API 요청량이 많아 잠시 대기 중). 조금 있다가 다시 시도하면 더 많이 찾아줘요.</div>';
     } else {
-      fbSec.innerHTML = '<div class="card c-firebase" style="opacity:.5;font-size:13px;color:var(--text-soft);padding:14px 18px;">'+(fd.gosho.length||fd.speeches.length?'일기와 관련된 데이터를 찾지 못했어요':'설정 탭에서 로그인하면 내 어서·스피치가 여기 표시돼요')+'</div>';
+      fbSec.innerHTML = '<div class="card c-firebase" style="opacity:.5;font-size:13px;color:var(--text-soft);padding:14px 18px;">'+(fd.gosho.length||fd.speeches.length?'일기와 뚜렷이 연결되는 내용을 찾지 못했어요':'설정 탭에서 로그인하면 내 어서·스피치가 여기 표시돼요')+'</div>';
     }
     if (fd.gosho.length || fd.speeches.length) _continuePersonalEmbeddingInBackground(); // 남은 항목은 백그라운드에서 이어서 준비
     await sleep(200); setStep('s2','done');
