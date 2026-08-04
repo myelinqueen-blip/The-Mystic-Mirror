@@ -33,6 +33,24 @@ body{background:var(--pink-bg);color:var(--text);margin:0;padding:0;min-height:1
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
 .wrap{max-width:680px;margin:0 auto;padding:0 16px 80px;}
 
+/* 상단 아이콘 바 */
+#topbar{position:sticky;top:0;z-index:110;background:linear-gradient(135deg,#ff8fab,#c78fd4);display:flex;align-items:center;justify-content:space-between;padding:9px 14px;}
+#topbar .tb-title{color:#fff;font-size:14px;font-weight:700;}
+#topbar .tb-icons{display:flex;align-items:center;gap:4px;}
+.hicon{background:rgba(255,255,255,.18);border:none;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;}
+.hicon:hover{background:rgba(255,255,255,.32);}
+.hicon svg{width:16px;height:16px;}
+.hicon img{width:16px;height:16px;border-radius:50%;background:#fff;padding:1px;}
+label.hicon input{display:none;}
+
+/* 접고 펼치기 섹션 */
+.section-head.collapsible{cursor:pointer;}
+.section-toggle-ic{font-size:11px;color:var(--text-soft);white-space:nowrap;margin-left:4px;}
+.rec-del{background:none;border:none;color:#d99;font-size:15px;cursor:pointer;padding:2px 6px;line-height:1;}
+.rec-del:hover{color:#c0567a;}
+.rec-card-row{display:flex;align-items:center;gap:4px;}
+.rec-card-row .rec-card{flex:1;}
+
 /* 폰트바 */
 .font-bar{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:8px 0 4px;}
 .font-bar-label{font-size:11px;color:var(--text-soft);}
@@ -89,7 +107,7 @@ textarea::placeholder{color:#e0aabb;}
 /* 🔥 Firebase 내 데이터 */
 .c-firebase{background:linear-gradient(135deg,#fff0f4,#f8f0ff);border:2px solid #e8c8f0;}
 .c-firebase .ctag{background:linear-gradient(135deg,var(--lav),var(--pink));color:white;}
-.fb-content{font-size:15px;line-height:2;color:var(--text);margin-bottom:6px;}
+.fb-content{font-size:15px;line-height:2;color:var(--text);margin-bottom:6px;white-space:pre-wrap;}
 .fb-meta{font-size:11px;color:var(--text-soft);}
 .fb-src{font-size:11px;color:var(--lav);background:var(--lav-light);border-radius:50px;padding:2px 8px;display:inline-block;margin-right:6px;}
 
@@ -151,17 +169,41 @@ textarea::placeholder{color:#e0aabb;}
 .modal-box{background:var(--white);border-radius:var(--r);max-width:640px;width:100%;margin:auto;padding:20px;position:relative;box-shadow:0 20px 60px rgba(58,45,74,.2);}
 .modal-close{position:absolute;top:12px;right:12px;background:var(--pink-pale);border:none;border-radius:50%;width:30px;height:30px;font-size:14px;cursor:pointer;color:var(--pink);display:flex;align-items:center;justify-content:center;}
 .modal-date{font-size:11px;color:var(--pink);margin-bottom:8px;}
-.modal-diary{font-size:14px;line-height:1.9;color:var(--text);margin-bottom:12px;padding-bottom:12px;border-bottom:2px dashed #ffd6e5;}
+.modal-diary{font-size:14px;line-height:1.9;color:var(--text);margin-bottom:12px;padding-bottom:12px;border-bottom:2px dashed #ffd6e5;white-space:pre-wrap;}
 @media(max-width:480px){.write-header h1{font-size:22px;}.card{padding:14px;}}
 </style>
 </head>
 <body>
 
+<div id="topbar">
+  <span class="tb-title">🌸 불법의 거울</span>
+  <div class="tb-icons">
+    <button id="loginIcon" class="hicon" onclick="googleLogin()" title="구글 로그인">
+      <svg viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/></svg>
+    </button>
+    <button id="logoutIcon" class="hicon" onclick="googleLogout()" title="로그아웃" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1M12 16v-2"/><circle cx="12" cy="17" r="1" fill="#fff" stroke="none"/></svg>
+    </button>
+    <button id="cloudSaveIcon" class="hicon" onclick="cloudSaveRecords()" title="클라우드에 기록 저장">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><rect x="7" y="13" width="10" height="8" rx="1"/><rect x="9" y="3" width="6" height="5" rx="0.5"/></svg>
+    </button>
+    <button id="backupIcon" class="hicon" onclick="downloadBackup()" title="백업 파일 다운로드">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 7 12 12 16 7"/><polyline points="8 13 12 18 16 13"/><line x1="5" y1="21" x2="19" y2="21"/></svg>
+    </button>
+    <label class="hicon" title="백업 파일에서 복원">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 4 2 10 8 10"/><path d="M4.5 16.5A9 9 0 1 0 5.5 8L2 10"/></svg>
+      <input type="file" accept=".json" onchange="restoreBackup(this)">
+    </label>
+    <button id="settingsIcon" class="hicon" onclick="openSettings()" title="설정">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </div>
+</div>
+
 <nav class="tab-nav">
-  <button class="tab-btn active" id="tb-write" onclick="showTab('write')"><span class="ti">✏️</span>오늘 쓰기</button>
-  <button class="tab-btn" id="tb-diaries" onclick="showTab('diaries')"><span class="ti">📖</span>일기</button>
-  <button class="tab-btn" id="tb-all" onclick="showTab('all')"><span class="ti">📚</span>전체</button>
-  <button class="tab-btn" id="tb-settings" onclick="showTab('settings')"><span class="ti">⚙️</span>설정</button>
+  <button class="tab-btn active" id="tb-write" onclick="showTab('write')"><span class="ti">✏️</span>일기</button>
+  <button class="tab-btn" id="tb-diaries" onclick="showTab('diaries')"><span class="ti">📖</span>모음</button>
+  <button class="tab-btn" id="tb-today" onclick="showTab('today')"><span class="ti">💫</span>오늘의 스피치</button>
 </nav>
 
 <!-- 오늘 쓰기 -->
@@ -216,16 +258,16 @@ textarea::placeholder{color:#e0aabb;}
     <!-- ① 내 신심일기 데이터 -->
     <div class="section-head sh-sgi"><span class="section-head-txt">🔥 내 신심일기 — 어서 · 스피치</span></div>
     <div id="firebaseSection">
-      <div class="card c-firebase" style="opacity:.5;font-size:13px;color:var(--text-soft);padding:14px 18px;">설정 탭에서 로그인하면 내 어서·스피치가 여기 표시돼요</div>
+      <div class="card c-firebase" style="opacity:.5;font-size:13px;color:var(--text-soft);padding:14px 18px;">설정에서 로그인하면 내 어서·스피치가 여기 표시돼요</div>
     </div>
 
     <!-- ② 동양철학 -->
-    <div class="section-head sh-east"><span class="section-head-txt">🌿 동양철학 — 논어 · 맹자 · 도덕경</span></div>
-    <div id="eastSection"></div>
+    <div class="section-head sh-east collapsible" onclick="toggleSection('eastWrap', this)"><span class="section-head-txt">🌿 동양철학 — 논어 · 맹자 · 도덕경</span><span class="section-toggle-ic">▶ 펼치기</span></div>
+    <div id="eastWrap" style="display:none;"><div id="eastSection"></div></div>
 
     <!-- ③ 서양·과학 -->
-    <div class="section-head sh-west"><span class="section-head-txt">🔭 서양철학 · 과학 — 양자역학 · 심리학 외</span></div>
-    <div id="westSection"></div>
+    <div class="section-head sh-west collapsible" onclick="toggleSection('westWrap', this)"><span class="section-head-txt">🔭 서양철학 · 과학 — 양자역학 · 심리학 외</span><span class="section-toggle-ic">▶ 펼치기</span></div>
+    <div id="westWrap" style="display:none;"><div id="westSection"></div></div>
 
     <button class="reset-btn" onclick="resetWrite()" style="display:block;width:100%;margin-top:10px;background:var(--white);color:var(--pink);border:2px solid var(--pink2);border-radius:50px;padding:12px;font-size:15px;cursor:pointer;">✨ 새로 쓰기</button>
     <div style="margin-top:16px;padding-top:12px;border-top:1px solid #f0e0ea;font-size:10px;color:var(--text-soft);line-height:1.9;text-align:center;">
@@ -237,7 +279,7 @@ textarea::placeholder{color:#e0aabb;}
 </div>
 </div>
 
-<!-- 일기 탭 -->
+<!-- 모음 탭 -->
 <div class="tab-panel" id="panel-diaries">
 <div class="wrap">
   <div class="rec-header"><span class="rec-title">📖 일기 모음</span><span class="rec-count" id="diary-count">0개</span></div>
@@ -245,44 +287,41 @@ textarea::placeholder{color:#e0aabb;}
 </div>
 </div>
 
-<!-- 전체 탭 -->
-<div class="tab-panel" id="panel-all">
+<!-- 오늘의 스피치 탭 -->
+<div class="tab-panel" id="panel-today">
 <div class="wrap">
-  <div class="rec-header"><span class="rec-title">📚 전체 기록</span><span class="rec-count" id="all-count">0개</span></div>
-  <div id="all-list"></div>
+  <div class="rec-header"><span class="rec-title">💫 오늘의 스피치</span></div>
+  <div id="today-content"></div>
 </div>
 </div>
 
-<!-- 설정 탭 -->
-<div class="tab-panel" id="panel-settings">
-<div class="wrap">
-  <div style="padding:18px 0 12px;font-size:20px;color:var(--text);">⚙️ 설정</div>
-  <div class="setup-banner">
-    <div class="setup-title">🔑 Gemini API 키</div>
-    <div class="setup-step">
-      <div class="setup-label">API 키 입력 (이 기기 브라우저에만 저장돼요)</div>
-      <input type="password" class="setup-input" id="geminiKeyInput" placeholder="API 키 입력">
-      <button class="save-btn" onclick="saveGeminiKey()">저장하기</button>
-      <div id="geminiKeyStatus" class="status-txt"></div>
+<div class="modal-overlay" id="settingsModal" onclick="if(event.target.id==='settingsModal')closeSettings();">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeSettings()">✕</button>
+    <div style="padding:2px 0 12px;font-size:20px;color:var(--text);">⚙️ 설정</div>
+    <div id="cloudSyncStatus" class="status-txt" style="margin-bottom:10px;">로그인하면 내 어서·스피치가 연동되고, API 키도 자동으로 동기화돼요</div>
+    <div class="setup-banner">
+      <div class="setup-title">🔑 Gemini API 키</div>
+      <div class="setup-step">
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:2px solid #ffd6e5;border-radius:50px;padding:8px 16px;font-size:13px;color:#c0567a;text-decoration:none;font-weight:700;margin-bottom:10px;">🔗 무료로 API 키 발급받기 (Google AI Studio) ↗</a>
+        <div style="font-size:12px;line-height:1.9;color:var(--text-soft);background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+          1. 위 링크 클릭 → 구글 계정으로 로그인<br>
+          2. 왼쪽 메뉴 <b>"Get API key"</b> 클릭<br>
+          3. <b>"Create API key"</b> 클릭 (기존 프로젝트 없으면 자동 생성됨)<br>
+          4. <b>AIza</b>로 시작하는 키가 생성되면 복사<br>
+          5. 아래 입력창에 붙여넣고 저장 — 카드 등록 없이 무료로 쓸 수 있어요
+        </div>
+        <div class="setup-label">API 키 입력 (이 기기에 저장, 로그인하면 내 계정에도 안전하게 동기화)</div>
+        <input type="password" class="setup-input" id="geminiKeyInput" placeholder="API 키 입력">
+        <button class="save-btn" onclick="saveGeminiKey()">저장하기</button>
+        <div id="geminiKeyStatus" class="status-txt"></div>
+      </div>
+    </div>
+    <div class="security-box" style="margin-top:10px;">
+      <div class="setup-title">🛡️ 보안 안내</div>
+      <div class="security-txt">✅ Gemini API 키 — 이 브라우저 + (로그인 시) 내 계정 전용 공간에만 저장<br>✅ Firebase — 구글 로그인 후 본인 데이터만 접근 (uid 인증 보호)<br>✅ 일기·어서·스피치 내용 — 의미 분석(임베딩)을 위해 Gemini API에만 전송, 별도 서버 저장 없음<br>✅ 임베딩 결과 — 이 기기 IndexedDB에만 저장<br>❌ 개인정보 외부 전송 없음</div>
     </div>
   </div>
-  <div class="setup-banner" style="margin-top:10px;">
-    <div class="setup-title">🔥 신심일기 Firebase 연동</div>
-    <div class="setup-step">
-      <div class="setup-label">구글 로그인하면 내 어서·스피치가 자동으로 연동돼요</div>
-      <button class="google-btn" id="googleLoginBtn" onclick="googleLogin()">
-        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/></svg>
-        구글 로그인
-      </button>
-      <button id="logoutBtn" onclick="googleLogout()" style="display:none;width:100%;margin-top:8px;padding:10px;border-radius:50px;border:2px solid #ffd6e5;background:white;color:#c0567a;font-size:14px;cursor:pointer;">🚪 로그아웃</button>
-      <div id="loginStatus" class="status-txt">로그인하면 내 어서·스피치가 연동돼요</div>
-    </div>
-  </div>
-  <div class="security-box" style="margin-top:10px;">
-    <div class="setup-title">🛡️ 보안 안내</div>
-    <div class="security-txt">✅ Gemini API 키 — 이 브라우저에만 저장<br>✅ Firebase — 구글 로그인 후 본인 데이터만 접근<br>✅ 일기·어서·스피치 내용 — 의미 분석(임베딩)을 위해 Gemini API에만 전송, 별도 서버 저장 없음<br>✅ 임베딩 결과 — 이 기기 localStorage에만 저장 (첫 실행 시 한 번만 계산)<br>❌ 개인정보 외부 전송 없음</div>
-  </div>
-</div>
 </div>
 
 <div class="modal-overlay" id="modal" onclick="closeModal(event)">
@@ -298,7 +337,7 @@ textarea::placeholder{color:#e0aabb;}
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { getDatabase, ref, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, get, set } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey:"AIzaSyAvtgUROy9sqe4mnjcb3HV4TzRQ6bXsCQA",
@@ -320,7 +359,10 @@ window._googleLogout = async function() {
     await signOut(auth);
     window._fbData = { gosho:[], speeches:[] };
     window._fbUid = null;
-    document.getElementById('loginStatus').textContent = '로그인하면 내 어서·스피치가 연동돼요';
+    const st = document.getElementById('cloudSyncStatus');
+    if (st) st.textContent = '로그인하면 내 어서·스피치가 연동되고, API 키도 자동으로 동기화돼요';
+    document.getElementById('loginIcon').style.display = 'flex';
+    document.getElementById('logoutIcon').style.display = 'none';
   } catch(e) {
     console.error('로그아웃 오류:', e);
   }
@@ -332,21 +374,36 @@ window._googleLogin = async function() {
     provider.setCustomParameters({ prompt:'select_account' });
     await signInWithPopup(auth, provider);
   } catch(e) {
-    const el = document.getElementById('loginStatus');
+    const el = document.getElementById('cloudSyncStatus');
     if (el) el.textContent = e.code === 'auth/popup-blocked' ? '팝업이 차단됐어요. 허용 후 다시 시도해줘요.' : '오류: ' + (e.code || e.message);
   }
+};
+
+// 이 기기에서 입력한 Gemini 키를 내 계정(uid 인증 보호) 아래에도 저장 — 다른 기기에서 다시 입력할 필요 없게
+window._saveGeminiKeyToCloud = async function(key) {
+  if (!window._fbUid) return false;
+  try {
+    await set(ref(db, 'users/'+window._fbUid+'/mysticMirror/geminiKey'), key);
+    return true;
+  } catch(e) { console.error('Gemini 키 클라우드 저장 오류:', e.message); return false; }
+};
+
+// 지금 기기에 저장된 일기 기록을 내 계정 아래로 백업 (저장 버튼)
+window._pushRecordsToCloud = async function(records) {
+  if (!window._fbUid) throw new Error('로그인 후 이용할 수 있어요');
+  await set(ref(db, 'users/'+window._fbUid+'/mysticMirror/records'), records);
 };
 
 onAuthStateChanged(auth, async function(user) {
   if (user) {
     window._fbUid = user.uid;
-    const el = document.getElementById('loginStatus');
-    const btn = document.getElementById('googleLoginBtn');
+    const st = document.getElementById('cloudSyncStatus');
     const badge = document.getElementById('firebaseBadge');
-    if (el) el.textContent = '✅ 연결됨';
-    if (btn) { btn.className = 'google-btn connected'; btn.textContent = '✅ 로그인됨'; }
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) logoutBtn.style.display = 'block';
+    if (st) st.textContent = '✅ 연결됨 — API 키·기록이 이 계정에 안전하게 동기화돼요';
+    const loginIcon = document.getElementById('loginIcon');
+    const logoutIcon = document.getElementById('logoutIcon');
+    if (loginIcon) loginIcon.style.display = 'none';
+    if (logoutIcon) logoutIcon.style.display = 'flex';
     if (badge) badge.innerHTML = '<span class="firebase-badge on">🔥 신심일기 연동됨</span>';
     try {
       // DB 구조 확인 후 올바른 경로로 읽기
@@ -415,14 +472,37 @@ onAuthStateChanged(auth, async function(user) {
       if (window._fbData.speeches.length > 0) console.log('스피치 샘플:', window._fbData.speeches[0].content.slice(0,50));
       // 로그인 직후부터 백그라운드에서 조금씩 임베딩을 준비해둠 (분석 화면에서 오래 기다리지 않도록)
       setTimeout(function(){ if (window._continuePersonalEmbeddingInBackground) window._continuePersonalEmbeddingInBackground(); }, 1000);
+
+      // Gemini 키 동기화 — 이 기기에 키가 없으면 내 계정(uid 인증 보호) 아래 저장된 키를 가져옴
+      try {
+        if (!localStorage.getItem('bf_gemini_key')) {
+          const keySnap = await get(ref(db, 'users/'+user.uid+'/mysticMirror/geminiKey'));
+          if (keySnap.exists() && keySnap.val()) {
+            localStorage.setItem('bf_gemini_key', keySnap.val());
+            if (window._onGeminiKeySynced) window._onGeminiKeySynced();
+          }
+        }
+      } catch(e) { console.error('Gemini 키 동기화 오류:', e.message); }
+
+      // 기록 클라우드 복원 — 이 기기에 저장된 기록이 하나도 없을 때만 자동으로 불러옴 (기존 로컬 기록은 덮어쓰지 않음)
+      try {
+        const localRecs = JSON.parse(localStorage.getItem('bf_records')||'[]');
+        if (!localRecs.length) {
+          const recSnap = await get(ref(db, 'users/'+user.uid+'/mysticMirror/records'));
+          if (recSnap.exists() && Array.isArray(recSnap.val()) && recSnap.val().length) {
+            localStorage.setItem('bf_records', JSON.stringify(recSnap.val()));
+            console.log('클라우드에서 기록 복원:', recSnap.val().length, '개');
+          }
+        }
+      } catch(e) { console.error('기록 클라우드 복원 오류:', e.message); }
     } catch(e) { console.error('Firebase 오류:', e.code); }
   } else {
     const badge = document.getElementById('firebaseBadge');
-    if (badge) badge.innerHTML = '<span class="firebase-badge off" onclick="showTab(\'settings\')">⚙️ 설정에서 로그인하면 내 어서·스피치 연동</span>';
-    const logoutBtn2 = document.getElementById('logoutBtn');
-    if (logoutBtn2) logoutBtn2.style.display = 'none';
-    const loginBtn2 = document.getElementById('googleLoginBtn');
-    if (loginBtn2) { loginBtn2.className = 'google-btn'; loginBtn2.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/></svg> 구글 로그인'; }
+    if (badge) badge.innerHTML = '<span class="firebase-badge off" onclick="openSettings()">⚙️ 설정에서 로그인하면 내 어서·스피치 연동</span>';
+    const loginIcon = document.getElementById('loginIcon');
+    const logoutIcon = document.getElementById('logoutIcon');
+    if (loginIcon) loginIcon.style.display = 'flex';
+    if (logoutIcon) logoutIcon.style.display = 'none';
   }
 });
 </script>
@@ -500,7 +580,7 @@ function _embedWait() {
 
 async function embedText(text, taskType, _retry) {
   const key = localStorage.getItem('bf_gemini_key');
-  if (!key) throw new Error('설정 탭에서 Gemini API 키를 먼저 입력해줘요 🔑');
+  if (!key) throw new Error('설정에서 Gemini API 키를 먼저 입력해줘요 🔑');
   await _embedWait();
   const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+EMBED_MODEL+':embedContent?key='+key, {
     method:'POST', headers:{'Content-Type':'application/json'},
@@ -677,7 +757,10 @@ function changeFont(n) {
 function googleLogin() { if (window._googleLogin) window._googleLogin(); }
 function googleLogout() { if (window._googleLogout) window._googleLogout(); }
 
-function saveGeminiKey() {
+function openSettings() { document.getElementById('settingsModal').classList.add('on'); }
+function closeSettings() { document.getElementById('settingsModal').classList.remove('on'); }
+
+async function saveGeminiKey() {
   const key = document.getElementById('geminiKeyInput').value.trim();
   if (!key || key.length < 10) { document.getElementById('geminiKeyStatus').textContent='❌ 키를 다시 확인해줘요'; document.getElementById('geminiKeyStatus').style.color='#c0567a'; return; }
   localStorage.setItem('bf_gemini_key', key);
@@ -685,7 +768,19 @@ function saveGeminiKey() {
   document.getElementById('geminiKeyInput').placeholder='✅ 저장됨';
   document.getElementById('geminiKeyStatus').textContent='✅ 저장됐어요!';
   document.getElementById('geminiKeyStatus').style.color='#1a6b48';
+  if (window._fbUid && window._saveGeminiKeyToCloud) {
+    const ok = await window._saveGeminiKeyToCloud(key);
+    if (ok) document.getElementById('geminiKeyStatus').textContent='✅ 저장 + 내 계정에 동기화 완료! (다른 기기에서도 자동 로드)';
+  }
 }
+// 로그인 시 클라우드에서 키를 자동으로 가져왔을 때 설정 화면 표시 갱신
+window._onGeminiKeySynced = function() {
+  const input = document.getElementById('geminiKeyInput');
+  const status = document.getElementById('geminiKeyStatus');
+  if (input) input.placeholder = '✅ 저장됨 (내 계정에서 자동 동기화됨)';
+  if (status) { status.textContent = '✅ 내 계정에서 API 키를 자동으로 불러왔어요'; status.style.color = '#1a6b48'; }
+  showToast('🔑 API 키를 자동으로 불러왔어요');
+};
 window.addEventListener('load', function() {
   if (localStorage.getItem('bf_gemini_key')) {
     document.getElementById('geminiKeyInput').placeholder='✅ 저장됨 (변경하려면 새 키 입력)';
@@ -700,12 +795,110 @@ function showTab(name) {
   document.getElementById('panel-'+name).classList.add('active');
   document.getElementById('tb-'+name).classList.add('active');
   if (name==='diaries') renderDiaries();
-  if (name==='all') renderAll();
+  if (name==='today') renderToday();
+}
+
+function toggleSection(wrapId, headerEl) {
+  const el = document.getElementById(wrapId);
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  const ic = headerEl.querySelector('.section-toggle-ic');
+  if (ic) ic.textContent = open ? '▶ 펼치기' : '▼ 접기';
+}
+
+// 작고 사라지는 알림 (알림창 대신)
+function showToast(msg) {
+  let t = document.getElementById('bfToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'bfToast';
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#4a3670;color:#fff;padding:10px 22px;border-radius:50px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s;box-shadow:0 6px 20px rgba(0,0,0,.2);pointer-events:none;max-width:88%;text-align:center;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(function(){ t.style.opacity='0'; }, 2400);
+}
+
+// ── 클라우드 저장 / 백업 다운로드 / 복원 ──
+async function cloudSaveRecords() {
+  if (!window._fbUid) { showToast('먼저 로그인해줘요 🔑'); return; }
+  try {
+    await window._pushRecordsToCloud(getRecords());
+    showToast('☁️ 클라우드에 저장했어요');
+  } catch(e) { showToast('❌ 저장 오류: '+e.message); }
+}
+
+function downloadBackup() {
+  const recs = getRecords();
+  const data = { app:'불법의 거울', exportedAt: new Date().toISOString(), count: recs.length, records: recs };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const d = new Date();
+  a.href = url;
+  a.download = '불법의거울_백업_'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('💾 백업 파일 다운로드 완료 ('+recs.length+'개)');
+}
+
+function restoreBackup(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      const recs = Array.isArray(data) ? data : (data.records || []);
+      if (!Array.isArray(recs)) throw new Error('records 배열을 찾을 수 없어요');
+      if (!confirm(recs.length+'개 기록으로 복원할까요?\n지금 이 기기에 있는 기록은 덮어써져요.')) { input.value=''; return; }
+      localStorage.setItem('bf_records', JSON.stringify(recs));
+      renderDiaries();
+      showToast('📂 복원 완료! ('+recs.length+'개)');
+    } catch(err) {
+      showToast('❌ 백업 파일 형식이 올바르지 않아요');
+    }
+    input.value = '';
+  };
+  reader.readAsText(file);
+}
+
+// ── 오늘의 스피치 탭: 매일 하나씩 어서·스피치 추천 (날짜 기준 고정 — 같은 날은 같은 추천) ──
+function seededIndex(seedStr, len) {
+  if (!len) return -1;
+  let h=0; for (let i=0;i<seedStr.length;i++) h=(Math.imul(31,h)+seedStr.charCodeAt(i))|0;
+  return Math.abs(h) % len;
+}
+function renderToday() {
+  const el = document.getElementById('today-content');
+  if (!window._fbUid) {
+    el.innerHTML = '<div class="empty-state"><span class="ei">💫</span>로그인하면 매일 어서·스피치를 하나씩 추천해줘요<br><button class="go-btn" style="margin-top:14px;display:inline-block;width:auto;padding:10px 24px;" onclick="openSettings()">설정에서 로그인하기</button></div>';
+    return;
+  }
+  const fd = window._fbData || { gosho:[], speeches:[] };
+  if (!fd.gosho.length && !fd.speeches.length) {
+    el.innerHTML = '<div class="empty-state"><span class="ei">💫</span>불러올 어서·스피치가 아직 없어요<br>신심일기에 기록이 쌓이면 여기 추천이 뜰 거예요</div>';
+    return;
+  }
+  const d = new Date();
+  const todayKey = d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+  let html = '';
+  if (fd.gosho.length) {
+    const g = fd.gosho[seededIndex(todayKey+'_gosho', fd.gosho.length)];
+    html += '<div class="section-head sh-sgi"><span class="section-head-txt">🔥 오늘의 어서</span></div><div class="card c-firebase"><div class="fb-content">'+g.content+'</div><div class="fb-meta"><span class="fb-src">'+(g.source||'신심일기')+'</span></div></div>';
+  }
+  if (fd.speeches.length) {
+    const s = fd.speeches[seededIndex(todayKey+'_speech', fd.speeches.length)];
+    html += '<div class="section-head sh-sgi" style="margin-top:14px;"><span class="section-head-txt">💫 오늘의 스피치</span></div><div class="card c-firebase"><div class="fb-content">'+s.content+'</div><div class="fb-meta"><span class="fb-src">'+(s.source||'신심일기')+'</span></div></div>';
+  }
+  el.innerHTML = html;
 }
 
 async function callGemini(prompt, system) {
   const key = localStorage.getItem('bf_gemini_key');
-  if (!key) throw new Error('설정 탭에서 Gemini API 키를 먼저 입력해줘요 🔑');
+  if (!key) throw new Error('설정에서 Gemini API 키를 먼저 입력해줘요 🔑');
   const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key, {
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({ system_instruction:{parts:[{text:system}]}, contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.1,maxOutputTokens:1024} })
@@ -729,6 +922,9 @@ async function analyze() {
   document.getElementById('results').classList.remove('on');
   document.getElementById('loading').classList.add('on');
   ['s1','s2','s3','s4'].forEach(function(id){ document.getElementById(id).className='step'; });
+  // 새 분석 시작 시 동양철학/서양철학 섹션은 다시 접어둠
+  ['eastWrap','westWrap'].forEach(function(id){ document.getElementById(id).style.display='none'; });
+  document.querySelectorAll('.section-toggle-ic').forEach(function(ic){ ic.textContent='▶ 펼치기'; });
 
   try {
     setStep('s1','active');
@@ -772,7 +968,7 @@ async function analyze() {
     } else if (personalErr) {
       fbSec.innerHTML = '<div class="card c-firebase" style="opacity:.5;font-size:13px;color:var(--text-soft);padding:14px 18px;">내 어서·스피치 준비 중이에요 (API 요청량이 많아 잠시 대기 중). 조금 있다가 다시 시도하면 더 많이 찾아줘요.</div>';
     } else {
-      fbSec.innerHTML = '<div class="card c-firebase" style="opacity:.5;font-size:13px;color:var(--text-soft);padding:14px 18px;">'+(fd.gosho.length||fd.speeches.length?'일기와 뚜렷이 연결되는 내용을 찾지 못했어요':'설정 탭에서 로그인하면 내 어서·스피치가 여기 표시돼요')+'</div>';
+      fbSec.innerHTML = '<div class="card c-firebase" style="opacity:.5;font-size:13px;color:var(--text-soft);padding:14px 18px;">'+(fd.gosho.length||fd.speeches.length?'일기와 뚜렷이 연결되는 내용을 찾지 못했어요':'설정에서 로그인하면 내 어서·스피치가 여기 표시돼요')+'</div>';
     }
     if (fd.gosho.length || fd.speeches.length) _continuePersonalEmbeddingInBackground(); // 남은 항목은 백그라운드에서 이어서 준비
     await sleep(200); setStep('s2','done');
@@ -831,22 +1027,17 @@ function renderDiaries() {
   if(!recs.length){ el.innerHTML='<div class="empty-state"><span class="ei">📖</span>아직 기록이 없어요<br>오늘의 마음을 적어봐요 🌸</div>'; return; }
   el.innerHTML=Object.entries(groupByDate(recs)).map(function(e){
     return '<div class="date-group"><div class="date-label">🌸 '+fmtDate(e[1][0].date)+'</div>'+e[1].map(function(r){
-      return '<div class="rec-card" onclick="openModal('+r.id+')"><div class="rec-time">'+fmtTime(r.date)+'</div><div class="rec-txt">'+(r.diary.length>80?r.diary.slice(0,80)+'…':r.diary)+'</div><div class="rec-preview">→ 관련 자료 보기</div></div>';
+      return '<div class="rec-card-row"><div class="rec-card" onclick="openModal('+r.id+')"><div class="rec-time">'+fmtTime(r.date)+'</div><div class="rec-txt">'+(r.diary.length>80?r.diary.slice(0,80)+'…':r.diary)+'</div><div class="rec-preview">→ 관련 자료 보기</div></div><button class="rec-del" onclick="event.stopPropagation();deleteRecord('+r.id+')" title="삭제">🗑</button></div>';
     }).join('')+'</div>';
   }).join('');
 }
 
-function renderAll() {
-  const recs=getRecords(); document.getElementById('all-count').textContent=recs.length+'개';
-  const el=document.getElementById('all-list');
-  if(!recs.length){ el.innerHTML='<div class="empty-state"><span class="ei">📚</span>아직 기록이 없어요 🌸</div>'; return; }
-  el.innerHTML=Object.entries(groupByDate(recs)).map(function(e){
-    return '<div class="date-group"><div class="date-label">🌸 '+fmtDate(e[1][0].date)+'</div>'+e[1].map(function(r){
-      const eHtml=(r.eastern_ids||[]).map(function(eid){const item=EASTERN[eid];return item?'<div style="margin-bottom:6px;"><b>'+item.title+'</b> — '+item.meaning+'</div>':''; }).join('');
-      const wHtml=(r.western_ids||[]).map(function(wid){const item=WESTERN[wid];return item?'<div style="margin-bottom:6px;"><b>'+item.title+'</b> — '+item.summary.slice(0,60)+'…</div>':''; }).join('');
-      return '<div class="card" style="background:white;border:2px solid #ffe4ee;margin-bottom:10px;"><div style="font-size:11px;color:var(--text-soft);margin-bottom:8px;">'+fmtTime(r.date)+'</div><div style="font-size:14px;line-height:1.8;color:var(--text);margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed #ffd6e5;">'+r.diary+'</div>'+(r.myGosho?'<div style="font-size:13px;color:#4a3670;background:var(--lav-light);padding:10px;border-radius:10px;margin-bottom:8px;"><b>🔥 내 어서</b><br>'+r.myGosho.content+'</div>':'')+(eHtml?'<div style="font-size:13px;color:#2d5a2d;background:var(--sage-light);padding:10px;border-radius:10px;margin-bottom:8px;"><b>🌿 동양철학</b><br>'+eHtml+'</div>':'')+(wHtml?'<div style="font-size:13px;color:#1f5470;background:var(--sky-light);padding:10px;border-radius:10px;"><b>🔭 서양·과학</b><br>'+wHtml+'</div>':'')+'</div>';
-    }).join('')+'</div>';
-  }).join('');
+function deleteRecord(id) {
+  if (!confirm('이 일기를 삭제할까요? 되돌릴 수 없어요.')) return;
+  const recs = getRecords().filter(function(r){ return r.id !== id; });
+  localStorage.setItem('bf_records', JSON.stringify(recs));
+  renderDiaries();
+  showToast('🗑 삭제했어요');
 }
 
 function openModal(id) {
@@ -856,7 +1047,7 @@ function openModal(id) {
   const eHtml=(r.eastern_ids||[]).map(function(eid){const item=EASTERN[eid];return item?'<div style="margin-bottom:8px;padding:10px;background:var(--sage-light);border-radius:10px;"><div style="font-size:12px;font-weight:700;color:#2d5a2d;">🌿 '+item.title+'</div><div style="font-size:12px;color:#3d6a3d;margin-top:4px;">'+item.cn+'</div><div style="font-size:12px;color:#2d5a2d;font-weight:700;margin-top:2px;">→ '+item.meaning+'</div></div>':''; }).join('');
   const wHtml=(r.western_ids||[]).map(function(wid){const item=WESTERN[wid];return item?'<div style="margin-bottom:8px;padding:10px;background:var(--sky-light);border-radius:10px;"><div style="font-size:12px;font-weight:700;color:#1f5470;">🔭 '+item.title+'</div><div style="font-size:12px;color:#1f5470;margin-top:4px;">'+item.summary+'</div></div>':''; }).join('');
   document.getElementById('modal-content').innerHTML=
-    (r.myGosho?'<div style="margin-bottom:8px;padding:10px;background:linear-gradient(135deg,#fff0f4,#f8f0ff);border-radius:10px;border:1.5px solid #e8c8f0;"><div style="font-size:11px;color:var(--lav);font-weight:700;">🔥 내 신심일기 어서</div><div style="font-size:13px;line-height:1.9;color:var(--text);margin-top:4px;">'+r.myGosho.content+'</div></div>':'')+
+    (r.myGosho?'<div style="margin-bottom:8px;padding:10px;background:linear-gradient(135deg,#fff0f4,#f8f0ff);border-radius:10px;border:1.5px solid #e8c8f0;"><div style="font-size:11px;color:var(--lav);font-weight:700;">🔥 내 신심일기 어서</div><div style="font-size:13px;line-height:1.9;color:var(--text);margin-top:4px;white-space:pre-wrap;">'+r.myGosho.content+'</div></div>':'')+
     eHtml+wHtml;
   document.getElementById('modal').classList.add('on');
 }
