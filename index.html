@@ -362,19 +362,21 @@ onAuthStateChanged(auth, async function(user) {
           const essayData = entry[1];
           if (essayData && essayData.memos) {
             Object.values(essayData.memos).forEach(function(memo) {
-              const txt = memo && (memo.content || memo.text || memo.memo || memo.body || '');
+              // 신심일기 앱은 memos를 문자열 배열로 저장함 (memo.content 같은 객체 필드 아님)
+              const txt = typeof memo === 'string' ? memo : (memo && (memo.content || memo.text || memo.memo || memo.body) || '');
               if (txt && txt.length > 5) {
                 window._fbData.gosho.push({
                   content: txt,
                   category: essayName,
                   source: essayName,
-                  tags: memo.keywords ? String(memo.keywords).split(',') : []
+                  tags: []
                 });
               }
             });
           }
           // 참고: essayData.core("어서 핵심")는 폴더당 자유메모 1칸이라 실제 어서 인용이 아닌 다른 메모가 들어있을 수 있어 후보에서 제외함
         });
+        console.log('essayNotes 진단 — 폴더 총', Object.keys(essays).length, '개 / 추출된 어서 메모 총', window._fbData.gosho.length, '개');
       }
 
       // 스피치: records/{날짜}/speech/{index}/text
