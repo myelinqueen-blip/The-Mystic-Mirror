@@ -329,9 +329,11 @@ textarea::placeholder{color:#e0aabb;}
           4. <b>AIza</b>로 시작하는 키가 생성되면 복사<br>
           5. 아래 입력창에 붙여넣고 저장 — 카드 등록 없이 무료로 쓸 수 있어요
         </div>
-        <div class="setup-label">API 키 입력 (이 기기에 저장, 로그인하면 내 계정에도 안전하게 동기화)</div>
+        <div class="setup-label" style="margin-top:2px;">등록된 키 (여러 개 추가하면 하나 소진 시 자동 전환)</div>
+        <div id="keyListArea"></div>
+        <div class="setup-label">새 API 키 추가 (이 기기 + 로그인 시 내 계정에 안전하게 동기화)</div>
         <input type="password" class="setup-input" id="geminiKeyInput" placeholder="API 키 입력">
-        <button class="save-btn" onclick="saveGeminiKey()">저장하기</button>
+        <button class="save-btn" onclick="saveGeminiKey()">키 추가하기</button>
         <div id="geminiKeyStatus" class="status-txt"></div>
       </div>
     </div>
@@ -397,11 +399,11 @@ window._googleLogin = async function() {
   }
 };
 
-// 이 기기에서 입력한 Gemini 키를 내 계정(uid 인증 보호) 아래에도 저장 — 다른 기기에서 다시 입력할 필요 없게
-window._saveGeminiKeyToCloud = async function(key) {
+// 이 기기에 등록된 Gemini 키 목록을 내 계정(uid 인증 보호) 아래에도 저장 — 다른 기기에서 다시 입력할 필요 없게
+window._saveGeminiKeysToCloud = async function(keys) {
   if (!window._fbUid) return false;
   try {
-    await set(ref(db, 'users/'+window._fbUid+'/mysticMirror/geminiKey'), key);
+    await set(ref(db, 'users/'+window._fbUid+'/mysticMirror/geminiKeys'), keys);
     return true;
   } catch(e) { console.error('Gemini 키 클라우드 저장 오류:', e.message); return false; }
 };
@@ -491,12 +493,17 @@ onAuthStateChanged(auth, async function(user) {
       // 로그인 직후부터 백그라운드에서 조금씩 임베딩을 준비해둠 (분석 화면에서 오래 기다리지 않도록)
       setTimeout(function(){ if (window._continuePersonalEmbeddingInBackground) window._continuePersonalEmbeddingInBackground(); }, 1000);
 
-      // Gemini 키 동기화 — 이 기기에 키가 없으면 내 계정(uid 인증 보호) 아래 저장된 키를 가져옴
+      // Gemini 키 동기화 — 내 계정(uid 인증 보호) 아래 저장된 키 목록을 가져와 이 기기 목록과 합침
       try {
-        if (!localStorage.getItem('bf_gemini_key')) {
-          const keySnap = await get(ref(db, 'users/'+user.uid+'/mysticMirror/geminiKey'));
-          if (keySnap.exists() && keySnap.val()) {
-            localStorage.setItem('bf_gemini_key', keySnap.val());
+        const keysSnap = await get(ref(db, 'users/'+user.uid+'/mysticMirror/geminiKeys'));
+        if (keysSnap.exists() && Array.isArray(keysSnap.val()) && keysSnap.val().length) {
+          let local = [];
+          try { local = JSON.parse(localStorage.getItem('bf_gemini_keys')||'[]'); } catch(e){}
+          const legacy = localStorage.getItem('bf_gemini_key');
+          if (legacy && !local.includes(legacy)) local.push(legacy);
+          const merged = Array.from(new Set(local.concat(keysSnap.val())));
+          if (merged.length !== local.length || !local.length) {
+            localStorage.setItem('bf_gemini_keys', JSON.stringify(merged));
             if (window._onGeminiKeySynced) window._onGeminiKeySynced();
           }
         }
@@ -586,6 +593,37 @@ async function idbSet(key, value) {
   } catch(e) { console.error('IndexedDB 저장 오류:', e.message); }
 }
 
+// ── Gemini API 키 풀 (여러 개 등록 가능, 하나 소진되면 자동으로 다음 키로 전환) ──
+function getKeyPool() {
+  let pool = [];
+  try { pool = JSON.parse(localStorage.getItem('bf_gemini_keys')||'[]'); } catch(e){}
+  if (!Array.isArray(pool)) pool = [];
+  const legacy = localStorage.getItem('bf_gemini_key'); // 예전 단일 키 자동 마이그레이션
+  if (legacy && !pool.includes(legacy)) { pool.push(legacy); localStorage.setItem('bf_gemini_keys', JSON.stringify(pool)); localStorage.removeItem('bf_gemini_key'); }
+  return pool;
+}
+function _keyQuotaMap() {
+  try { return JSON.parse(localStorage.getItem('bf_key_quota_status')||'{}'); } catch(e){ return {}; }
+}
+function _isKeyExhausted(key) {
+  const until = _keyQuotaMap()[simpleHash(key)] || 0;
+  return Date.now() < until;
+}
+function _markKeyExhausted(key) {
+  const map = _keyQuotaMap();
+  const tomorrow = new Date();
+  tomorrow.setHours(24,0,5,0); // 자정(+5초) 이후 다시 시도 — 무료 할당량은 보통 자정(태평양시) 기준 리셋
+  map[simpleHash(key)] = tomorrow.getTime();
+  try { localStorage.setItem('bf_key_quota_status', JSON.stringify(map)); } catch(e){}
+}
+function _availableKeys() {
+  return getKeyPool().filter(function(k){ return !_isKeyExhausted(k); });
+}
+function _allKeysExhausted() {
+  const pool = getKeyPool();
+  return pool.length > 0 && _availableKeys().length === 0;
+}
+
 // ── 전역 속도 제한 (무료 티어 쿼터 보호: embed_content 분당 100건 한도보다 여유 있게) ──
 let _embedNextAvailable = 0;
 const EMBED_INTERVAL_MS = 700; // 요청 사이 최소 간격 → 분당 약 85건, 100건 한도 아래로 여유
@@ -596,38 +634,69 @@ function _embedWait() {
   return wait > 0 ? sleep(wait) : Promise.resolve();
 }
 
-async function embedText(text, taskType, _retry) {
-  const key = localStorage.getItem('bf_gemini_key');
-  if (!key) throw new Error('설정에서 Gemini API 키를 먼저 입력해줘요 🔑');
-  await _embedWait();
-  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+EMBED_MODEL+':embedContent?key='+key, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({
-      content: { parts:[{ text: String(text).slice(0,2000) }] },
-      taskType: taskType || 'SEMANTIC_SIMILARITY',
-      outputDimensionality: EMBED_DIM
-    })
-  });
-  if (!res.ok) {
+let _keyRotateIdx = 0;
+
+async function embedText(text, taskType, _minuteRetry) {
+  const pool = getKeyPool();
+  if (!pool.length) throw new Error('설정에서 Gemini API 키를 먼저 입력해줘요 🔑');
+
+  const maxAttempts = pool.length * 2;
+  let lastErr = null;
+  for (let attempt=0; attempt<maxAttempts; attempt++) {
+    const avail = _availableKeys();
+    if (!avail.length) {
+      throw new Error(pool.length>1 ? '등록된 API 키 '+pool.length+'개가 모두 오늘 할당량을 다 썼어요. 내일 다시 시도하거나 설정에서 키를 추가해줘요.' : '오늘 무료 임베딩 할당량을 다 썼어요. 내일 다시 시도하거나 설정에서 키를 하나 더 추가해줘요.');
+    }
+    const key = avail[_keyRotateIdx % avail.length];
+    _keyRotateIdx++;
+    await _embedWait();
+    let res;
+    try {
+      res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+EMBED_MODEL+':embedContent?key='+key, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          content: { parts:[{ text: String(text).slice(0,2000) }] },
+          taskType: taskType || 'SEMANTIC_SIMILARITY',
+          outputDimensionality: EMBED_DIM
+        })
+      });
+    } catch(networkErr) { lastErr = networkErr; continue; }
+
+    if (res.ok) {
+      const d = await res.json();
+      return normalizeVec(d.embedding.values);
+    }
     const e = await res.json().catch(function(){return {};});
     const msg = e.error?.message || ('임베딩 오류 '+res.status);
-    // 429(할당량 초과)면 서버가 알려준 대기시간만큼 쉬었다가 자동 재시도
-    if (res.status === 429 && (_retry||0) < 6) {
-      const m = msg.match(/retry in ([\d.]+)s/i);
-      const wait = m ? Math.ceil(parseFloat(m[1])*1000)+800 : ((_retry||0)+1)*10000;
-      await sleep(wait);
-      return embedText(text, taskType, (_retry||0)+1);
+    lastErr = new Error(msg);
+    if (res.status === 429) {
+      const limitMatch = msg.match(/limit:\s*(\d+)/i);
+      const limitNum = limitMatch ? parseInt(limitMatch[1],10) : 0;
+      if (limitNum >= 500) {
+        // 하루 단위 할당량 소진 — 이 키만 오늘 하루 쉬게 하고 다른 키(있으면)로 바로 전환
+        _markKeyExhausted(key);
+        if (window.showToast) window.showToast('🔑 키 하나가 오늘 할당량을 다 썼어요' + (_availableKeys().length ? ' — 다음 키로 전환할게요' : ''));
+        continue;
+      }
+      // 분당 한도 — 다른 키가 있으면 바로 그 키로 전환, 없으면 대기 후 재시도
+      if (avail.length > 1) continue;
+      if ((_minuteRetry||0) < 6) {
+        const m = msg.match(/retry in ([\d.]+)s/i);
+        const wait = m ? Math.ceil(parseFloat(m[1])*1000)+800 : ((_minuteRetry||0)+1)*10000;
+        await sleep(wait);
+        return embedText(text, taskType, (_minuteRetry||0)+1);
+      }
     }
-    throw new Error(msg);
+    break; // 429가 아닌 다른 오류면 재시도 없이 바로 던짐
   }
-  const d = await res.json();
-  return normalizeVec(d.embedding.values);
+  throw lastErr || new Error('임베딩 요청이 계속 실패했어요');
 }
 
-// 여러 텍스트를 순차 임베딩 (전역 속도 제한 + 429 자동 재시도가 embedText에 내장돼 있어 안전)
+// 여러 텍스트를 순차 임베딩 (전역 속도 제한 + 429 자동 재시도/키 전환이 embedText에 내장돼 있어 안전)
 async function embedBatch(texts, taskType, onProgress) {
   const out = [];
   for (let i=0;i<texts.length;i++) {
+    if (_allKeysExhausted()) break; // 등록된 키가 모두 소진됐으면 남은 항목은 바로 포기 (헛된 재시도 방지)
     out.push(await embedText(texts[i], taskType || 'RETRIEVAL_DOCUMENT'));
     if (onProgress) onProgress(i+1, texts.length);
   }
@@ -680,11 +749,13 @@ async function embedPersonalData(onProgress) {
   const runIdx = toEmbedIdx.slice(0, MAX_PERSONAL_EMBED_PER_CALL);
   let done = 0;
   for (let i=0;i<runIdx.length;i++) {
+    if (_allKeysExhausted()) break;
     const idx = runIdx[i];
     try {
       cache[hashes[idx]] = await embedText(all[idx].content, 'RETRIEVAL_DOCUMENT');
     } catch(e) {
       console.error('개인 데이터 임베딩 실패(건너뜀):', e.message);
+      if (_allKeysExhausted()) break;
     }
     done++;
     if (onProgress) onProgress(done, runIdx.length, toEmbedIdx.length);
@@ -701,6 +772,7 @@ async function _continuePersonalEmbeddingInBackground() {
   window._embedBackgroundRunning = true;
   try {
     for (let round=0; round<30; round++) {
+      if (_allKeysExhausted()) break;
       const fd = window._fbData || { gosho:[], speeches:[] };
       const total = fd.gosho.length + fd.speeches.length;
       if (!total) break;
@@ -781,30 +853,54 @@ function openSettings() { document.getElementById('settingsModal').classList.add
 function closeSettings() { document.getElementById('settingsModal').classList.remove('on'); }
 
 async function saveGeminiKey() {
-  const key = document.getElementById('geminiKeyInput').value.trim();
-  if (!key || key.length < 10) { document.getElementById('geminiKeyStatus').textContent='❌ 키를 다시 확인해줘요'; document.getElementById('geminiKeyStatus').style.color='#c0567a'; return; }
-  localStorage.setItem('bf_gemini_key', key);
-  document.getElementById('geminiKeyInput').value='';
-  document.getElementById('geminiKeyInput').placeholder='✅ 저장됨';
-  document.getElementById('geminiKeyStatus').textContent='✅ 저장됐어요!';
-  document.getElementById('geminiKeyStatus').style.color='#1a6b48';
-  if (window._fbUid && window._saveGeminiKeyToCloud) {
-    const ok = await window._saveGeminiKeyToCloud(key);
-    if (ok) document.getElementById('geminiKeyStatus').textContent='✅ 저장 + 내 계정에 동기화 완료! (다른 기기에서도 자동 로드)';
+  const input = document.getElementById('geminiKeyInput');
+  const key = input.value.trim();
+  const status = document.getElementById('geminiKeyStatus');
+  if (!key || key.length < 10) { status.textContent='❌ 키를 다시 확인해줘요'; status.style.color='#c0567a'; return; }
+  const pool = getKeyPool();
+  if (pool.includes(key)) { status.textContent='이미 등록된 키예요'; status.style.color='#c0567a'; input.value=''; return; }
+  pool.push(key);
+  localStorage.setItem('bf_gemini_keys', JSON.stringify(pool));
+  input.value='';
+  status.textContent='✅ 키 추가됨! (총 '+pool.length+'개)';
+  status.style.color='#1a6b48';
+  renderKeyList();
+  if (window._fbUid && window._saveGeminiKeysToCloud) {
+    const ok = await window._saveGeminiKeysToCloud(pool);
+    if (ok) status.textContent='✅ 추가 + 내 계정에 동기화 완료 (총 '+pool.length+'개)';
   }
 }
-// 로그인 시 클라우드에서 키를 자동으로 가져왔을 때 설정 화면 표시 갱신
+function removeKey(idx) {
+  const pool = getKeyPool();
+  pool.splice(idx,1);
+  localStorage.setItem('bf_gemini_keys', JSON.stringify(pool));
+  renderKeyList();
+  showToast('키를 삭제했어요');
+  if (window._fbUid && window._saveGeminiKeysToCloud) window._saveGeminiKeysToCloud(pool);
+}
+function renderKeyList() {
+  const el = document.getElementById('keyListArea');
+  if (!el) return;
+  const pool = getKeyPool();
+  if (!pool.length) { el.innerHTML = '<div style="font-size:12px;color:var(--text-soft);margin-bottom:8px;">등록된 키가 없어요</div>'; return; }
+  el.innerHTML = pool.map(function(k,i){
+    const masked = k.slice(0,6)+'···'+k.slice(-4);
+    const exhausted = _isKeyExhausted(k);
+    return '<div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1.5px solid #ffe4ee;border-radius:10px;padding:8px 12px;margin-bottom:6px;font-size:12px;">'
+      +'<span>'+(exhausted?'⏳':'✅')+' '+masked+(exhausted?' <span style="color:#c0567a;">(오늘 소진)</span>':'')+'</span>'
+      +'<button onclick="removeKey('+i+')" title="삭제" style="border:none;background:none;color:#d99;cursor:pointer;font-size:14px;">✕</button></div>';
+  }).join('') + '<div style="font-size:11px;color:var(--text-soft);margin:2px 0 10px;">키 여러 개를 등록하면, 하나가 하루 할당량(1,000건)을 다 써도 자동으로 다음 키로 전환돼요.</div>';
+}
+// 로그인 시 클라우드에서 키 목록을 자동으로 가져왔을 때 설정 화면 표시 갱신
 window._onGeminiKeySynced = function() {
-  const input = document.getElementById('geminiKeyInput');
-  const status = document.getElementById('geminiKeyStatus');
-  if (input) input.placeholder = '✅ 저장됨 (내 계정에서 자동 동기화됨)';
-  if (status) { status.textContent = '✅ 내 계정에서 API 키를 자동으로 불러왔어요'; status.style.color = '#1a6b48'; }
+  renderKeyList();
   showToast('🔑 API 키를 자동으로 불러왔어요');
 };
 window.addEventListener('load', function() {
-  if (localStorage.getItem('bf_gemini_key')) {
-    document.getElementById('geminiKeyInput').placeholder='✅ 저장됨 (변경하려면 새 키 입력)';
-    document.getElementById('geminiKeyStatus').textContent='✅ API 키 저장되어 있어요';
+  renderKeyList();
+  const pool = getKeyPool();
+  if (pool.length) {
+    document.getElementById('geminiKeyStatus').textContent='✅ 키 '+pool.length+'개 등록되어 있어요';
     document.getElementById('geminiKeyStatus').style.color='#1a6b48';
   }
 });
@@ -936,8 +1032,9 @@ function renderToday() {
 }
 
 async function callGemini(prompt, system) {
-  const key = localStorage.getItem('bf_gemini_key');
-  if (!key) throw new Error('설정에서 Gemini API 키를 먼저 입력해줘요 🔑');
+  const pool = getKeyPool();
+  if (!pool.length) throw new Error('설정에서 Gemini API 키를 먼저 입력해줘요 🔑');
+  const key = pool[0];
   const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key, {
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({ system_instruction:{parts:[{text:system}]}, contents:[{parts:[{text:prompt}]}], generationConfig:{temperature:0.1,maxOutputTokens:1024} })
